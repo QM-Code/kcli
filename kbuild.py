@@ -29,6 +29,7 @@ def usage(exit_code: int = 1) -> None:
         "  --initialize-git    verify remote, initialize local git repo, commit, and push main",
         file=sys.stderr,
     )
+    print("  --git-sync <msg>    git add . && git commit -m <msg> && git push", file=sys.stderr)
     print("  --sync-vcpkg-baseline  set baseline fields from ./vcpkg/src HEAD", file=sys.stderr)
     print(
         "  --install-vcpkg     clone/bootstrap local vcpkg under ./vcpkg, sync baseline, then build",
@@ -44,6 +45,21 @@ def fail(message: str) -> None:
 
 def run(cmd: list[str], *, env: dict[str, str] | None = None) -> None:
     subprocess.run(cmd, check=True, env=env)
+
+
+def enforce_script_directory() -> str:
+    repo_root = os.path.abspath(os.path.dirname(__file__))
+    cwd = os.path.abspath(os.getcwd())
+    repo_root_cmp = os.path.normcase(os.path.realpath(repo_root))
+    cwd_cmp = os.path.normcase(os.path.realpath(cwd))
+    if cwd_cmp != repo_root_cmp:
+        print(
+            "Error: kbuild.py must be run from the directory it is in.\n"
+            "Run `./kbuild.py` from that directory.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    return repo_root
 
 
 def format_dir_for_output(path: str, repo_root: str) -> str:
@@ -930,6 +946,42 @@ def initialize_git_repo(repo_root: str, repo_url: str, auth_url: str) -> int:
     return 0
 
 
+def git_sync(repo_root: str, commit_message: str) -> int:
+    worktree_check = subprocess.run(
+        ["git", "-C", repo_root, "rev-parse", "--is-inside-work-tree"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if worktree_check.returncode != 0 or worktree_check.stdout.strip().lower() != "true":
+        print(
+            "Error: git repository is not initialized. Run `./kbuild.py --initialize-git`.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+
+    add_result = subprocess.run(["git", "-C", repo_root, "add", "."], check=False)
+    if add_result.returncode != 0:
+        print("Error: git add failed.", file=sys.stderr)
+        raise SystemExit(2)
+
+    commit_result = subprocess.run(
+        ["git", "-C", repo_root, "commit", "-m", commit_message],
+        check=False,
+    )
+    if commit_result.returncode != 0:
+        print("Error: git commit failed.", file=sys.stderr)
+        raise SystemExit(2)
+
+    push_result = subprocess.run(["git", "-C", repo_root, "push"], check=False)
+    if push_result.returncode != 0:
+        print("Error: git push failed.", file=sys.stderr)
+        raise SystemExit(2)
+
+    print("Git sync complete.", flush=True)
+    return 0
+
+
 def sync_vcpkg_baseline(repo_root: str) -> str:
     local_vcpkg_root, _, _, _, _ = local_vcpkg_paths(repo_root)
     if not os.path.isdir(local_vcpkg_root):
@@ -1093,6 +1145,7 @@ def build_demo(
 
 
 def main() -> int:
+    repo_root = enforce_script_directory()
     args = sys.argv[1:]
     version = "latest"
     version_explicit = False
@@ -1105,6 +1158,8 @@ def main() -> int:
     remove_latest_builds = False
     initialize_repo = False
     initialize_git = False
+    git_sync_requested = False
+    git_sync_message = ""
     requested_demos: list[str] = []
 
     i = 0
@@ -1122,6 +1177,14 @@ def main() -> int:
             initialize_repo = True
         elif arg == "--initialize-git":
             initialize_git = True
+        elif arg == "--git-sync":
+            git_sync_requested = True
+            i += 1
+            if i >= len(args):
+                fail("missing value for '--git-sync'")
+            git_sync_message = args[i].strip()
+            if not git_sync_message:
+                fail("--git-sync requires a non-empty commit message")
         elif arg == "--sync-vcpkg-baseline":
             sync_vcpkg_baseline_only = True
         elif arg == "--version":
@@ -1162,6 +1225,7 @@ def main() -> int:
         or remove_latest_builds
         or initialize_repo
         or initialize_git
+        or git_sync_requested
         or sync_vcpkg_baseline_only
         or bool(build_mode_flags)
     ):
@@ -1179,16 +1243,30 @@ def main() -> int:
         list_builds
         or remove_latest_builds
         or initialize_repo
+        or git_sync_requested
         or sync_vcpkg_baseline_only
         or bool(build_mode_flags)
     ):
         fail("--initialize-git cannot be combined with other options")
+    if git_sync_requested and (
+        list_builds
+        or remove_latest_builds
+        or initialize_repo
+        or initialize_git
+        or sync_vcpkg_baseline_only
+        or bool(build_mode_flags)
+    ):
+        fail("--git-sync cannot be combined with other options")
     if sync_vcpkg_baseline_only and (
-        list_builds or remove_latest_builds or initialize_repo or initialize_git or build_mode_flags
+        list_builds
+        or remove_latest_builds
+        or initialize_repo
+        or initialize_git
+        or git_sync_requested
+        or build_mode_flags
     ):
         fail("--sync-vcpkg-baseline cannot be combined with other options")
 
-    repo_root = os.path.abspath(os.path.dirname(__file__))
     config_path = os.path.join(repo_root, "kbuild.json")
     if not os.path.isfile(config_path):
         if create_config:
@@ -1208,6 +1286,8 @@ def main() -> int:
     if initialize_git:
         git_url, git_auth = load_git_urls(repo_root)
         return initialize_git_repo(repo_root, git_url, git_auth)
+    if git_sync_requested:
+        return git_sync(repo_root, git_sync_message)
     allowed_entries = {"kbuild.py", "kbuild.json"}
     if all(entry in allowed_entries for entry in os.listdir(repo_root)):
         print("Empty directory. Run `./kbuild.py --initialize-repo` to initialize.", file=sys.stderr)
@@ -1555,10 +1635,22 @@ def initialize_repo_layout(repo_root: str) -> int:
         }
     }
     vcpkg_configuration_content = f"{json.dumps(vcpkg_configuration_payload, indent=2)}\n"
+    gitignore_content = (
+        "# Build directories\n"
+        "/build/\n"
+        "/demo/**/build/\n\n"
+        "# vcpkg\n"
+        "/vcpkg/src/\n"
+        "/vcpkg/build/\n\n"
+        "# Python caches\n"
+        "__pycache__/\n"
+        "*.pyc\n\n"
+    )
 
     files_to_write: list[tuple[str, str]] = [
         (os.path.join(repo_root, "CMakeLists.txt"), cmake_lists_content),
         (os.path.join(repo_root, "README.md"), readme_content),
+        (os.path.join(repo_root, ".gitignore"), gitignore_content),
         (os.path.join(repo_root, "agent", "BOOTSTRAP.md"), bootstrap_content),
         (os.path.join(repo_root, "src", f"{project_id}.cpp"), src_cpp_content),
         (os.path.join(repo_root, "vcpkg", "vcpkg.json"), vcpkg_json_content),
