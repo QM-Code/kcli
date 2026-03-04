@@ -1,0 +1,2 @@
+/home/karmak/dev/ktools/kcli/build/latest/CMakeFiles/edit_cache.dir
+/home/karmak/dev/ktools/kcli/build/latest/CMakeFiles/rebuild_cache.dir
