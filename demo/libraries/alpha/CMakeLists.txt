@@ -6,7 +6,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(KcliSDK CONFIG REQUIRED)
+if(NOT TARGET kcli::sdk)
+    find_package(KcliSDK CONFIG REQUIRED)
+endif()
 include(CMakePackageConfigHelpers)
 
 add_library(alpha_sdk STATIC

@@ -15,5 +15,15 @@
 	},
 	"vcpkg": {
 		"dependencies": []
+	},
+    "build" : {
+        "defaults": {
+            "demos": [
+                "libraries/alpha",
+                "libraries/beta",
+                "libraries/gamma",
+                "executable"
+            ]
+        }
 	}
 }

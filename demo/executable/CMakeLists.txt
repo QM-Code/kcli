@@ -6,10 +6,18 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(KcliSDK CONFIG REQUIRED)
-find_package(AlphaSDK CONFIG REQUIRED)
-find_package(BetaSDK CONFIG REQUIRED)
-find_package(GammaSDK CONFIG REQUIRED)
+if(NOT TARGET kcli::sdk)
+    find_package(KcliSDK CONFIG REQUIRED)
+endif()
+if(NOT TARGET alpha::sdk)
+    find_package(AlphaSDK CONFIG REQUIRED)
+endif()
+if(NOT TARGET beta::sdk)
+    find_package(BetaSDK CONFIG REQUIRED)
+endif()
+if(NOT TARGET gamma::sdk)
+    find_package(GammaSDK CONFIG REQUIRED)
+endif()
 
 add_executable(kcli_demo_executable
     src/main.cpp
