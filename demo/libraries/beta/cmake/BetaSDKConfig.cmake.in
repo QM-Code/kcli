@@ -1,0 +1,7 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(KcliSDK CONFIG REQUIRED)
+
+include("${CMAKE_CURRENT_LIST_DIR}/BetaSDKTargets.cmake")
+check_required_components(BetaSDK)
