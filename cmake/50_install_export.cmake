@@ -1,6 +1,6 @@
 include(CMakePackageConfigHelpers)
 
-set(KCLI_INSTALL_CMAKEDIR "lib/cmake/KcliSDK")
+set(KTOOLS_INSTALL_CMAKEDIR "lib/cmake/KcliSDK")
 
 install(TARGETS kcli_sdk
     EXPORT KcliSDKTargets
@@ -19,14 +19,14 @@ install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/
 install(EXPORT KcliSDKTargets
     FILE KcliSDKTargets.cmake
     NAMESPACE kcli::
-    DESTINATION ${KCLI_INSTALL_CMAKEDIR}
+    DESTINATION ${KTOOLS_INSTALL_CMAKEDIR}
     COMPONENT KcliSDK
 )
 
 configure_package_config_file(
     ${PROJECT_SOURCE_DIR}/cmake/KcliSDKConfig.cmake.in
     ${PROJECT_BINARY_DIR}/KcliSDKConfig.cmake
-    INSTALL_DESTINATION ${KCLI_INSTALL_CMAKEDIR}
+    INSTALL_DESTINATION ${KTOOLS_INSTALL_CMAKEDIR}
 )
 
 write_basic_package_version_file(
@@ -38,6 +38,6 @@ write_basic_package_version_file(
 install(FILES
     ${PROJECT_BINARY_DIR}/KcliSDKConfig.cmake
     ${PROJECT_BINARY_DIR}/KcliSDKConfigVersion.cmake
-    DESTINATION ${KCLI_INSTALL_CMAKEDIR}
+    DESTINATION ${KTOOLS_INSTALL_CMAKEDIR}
     COMPONENT KcliSDK
 )

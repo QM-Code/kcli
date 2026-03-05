@@ -1,6 +1,6 @@
 find_package(spdlog CONFIG REQUIRED)
 
-# kcli local-build layout guard:
+# ktools local-build layout guard:
 #
 # Keep the core build layout compatible with kbuild demo discovery:
 # build/<slot>/installed/<triplet>

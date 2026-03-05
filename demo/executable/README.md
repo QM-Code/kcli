@@ -12,7 +12,7 @@ demo libraries.
 
 The executable demo defines CLI behavior checks in:
 
-- `tests/demo_cli_cases.sh` (repo root)
+- `cmake/tests/demo_cli_cases.sh`
 
 When `BUILD_TESTING=ON`, `CMakeLists.txt` registers these CTest tests:
 

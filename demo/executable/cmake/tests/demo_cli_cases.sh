@@ -74,7 +74,7 @@ case "$test_case" in
             echo "Expected non-zero exit status for unknown alpha option" >&2
             exit 1
         fi
-        require_contains "$output" "unknown option '--alpha-d'"
+        require_contains "$output" "unknown option --alpha-d (use --alpha to list options)"
         require_not_contains "$output" "KCLI demo executable compile/link/integration check passed"
         ;;
     unknown_beta_option)
@@ -83,7 +83,7 @@ case "$test_case" in
             echo "Expected non-zero exit status for unknown beta option" >&2
             exit 1
         fi
-        require_contains "$output" "unknown option '--beta-z'"
+        require_contains "$output" "unknown option --beta-z (use --beta to list options)"
         require_not_contains "$output" "KCLI demo executable compile/link/integration check passed"
         ;;
     unknown_renamed_option)
@@ -92,7 +92,7 @@ case "$test_case" in
             echo "Expected non-zero exit status for unknown renamed option" >&2
             exit 1
         fi
-        require_contains "$output" "unknown option '--renamed-wut'"
+        require_contains "$output" "unknown option --renamed-wut (use --renamed to list options)"
         require_not_contains "$output" "KCLI demo executable compile/link/integration check passed"
         ;;
     known_alpha_option)
