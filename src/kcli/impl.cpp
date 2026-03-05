@@ -17,6 +17,9 @@ void Parser::Impl::Reset() {
     commands.clear();
     command_order.clear();
     aliases.clear();
+    root_value_handler = ValueHandler{};
+    root_value_usage.clear();
+    root_value_description.clear();
     unknown_option_handler = UnknownOptionHandler{};
     error_handler = ErrorHandler{};
     warning_handler = WarningHandler{};
@@ -132,6 +135,44 @@ bool Parser::Impl::HasCommand(std::string_view command) const {
         return false;
     }
     return commands.find(command_id) != commands.end();
+}
+
+void Parser::Impl::SetRootValueHandler(ValueHandler handler) {
+    if (!handler) {
+        throw std::invalid_argument("kcli root value handler must not be empty");
+    }
+    root_value_handler = std::move(handler);
+    root_value_usage.clear();
+    root_value_description.clear();
+}
+
+void Parser::Impl::SetRootValueHandler(ValueHandler handler,
+                                       std::string_view value_usage,
+                                       std::string_view description) {
+    if (!handler) {
+        throw std::invalid_argument("kcli root value handler must not be empty");
+    }
+
+    const std::string usage = detail::TrimWhitespace(value_usage);
+    if (usage.empty()) {
+        throw std::invalid_argument("kcli root value usage must not be empty");
+    }
+
+    const std::string desc = detail::NormalizeDescriptionOrThrow(description);
+
+    root_value_handler = std::move(handler);
+    root_value_usage = usage;
+    root_value_description = desc;
+}
+
+void Parser::Impl::ClearRootValueHandler() {
+    root_value_handler = ValueHandler{};
+    root_value_usage.clear();
+    root_value_description.clear();
+}
+
+bool Parser::Impl::HasRootValueHandler() const {
+    return static_cast<bool>(root_value_handler);
 }
 
 bool Parser::Impl::AddAlias(std::string_view alias,

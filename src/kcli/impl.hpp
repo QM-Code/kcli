@@ -28,6 +28,9 @@ struct Parser::Impl {
     std::unordered_map<std::string, CommandBinding> commands;
     std::vector<std::string> command_order;
     std::unordered_map<std::string, std::string> aliases;
+    ValueHandler root_value_handler{};
+    std::string root_value_usage{};
+    std::string root_value_description{};
 
     UnknownOptionHandler unknown_option_handler{};
     ErrorHandler error_handler{};
@@ -55,6 +58,12 @@ struct Parser::Impl {
                    ValueMode mode);
     void Remove(std::string_view command);
     bool HasCommand(std::string_view command) const;
+    void SetRootValueHandler(ValueHandler handler);
+    void SetRootValueHandler(ValueHandler handler,
+                             std::string_view value_usage,
+                             std::string_view description);
+    void ClearRootValueHandler();
+    bool HasRootValueHandler() const;
 
     bool AddAlias(std::string_view alias, std::string_view command);
     bool RemoveAlias(std::string_view alias);
@@ -91,6 +100,7 @@ private:
                             int index,
                             std::vector<bool>& consumed,
                             ProcessResult& result);
+    void emitDefaultError(const ProcessResult& result) const;
 
     void compactArgv(std::vector<bool>& consumed, ProcessResult& result);
 

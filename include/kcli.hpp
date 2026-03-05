@@ -120,6 +120,22 @@ public:
     // Inline mode: plain --<root> is reserved and always prints the registered
     // --<root>-<command> options with their descriptions.
     // EndUser mode: this behavior does not apply.
+    //
+    // Optional inline root value handler:
+    // - `--<root>` with no value: always prints --<root>-* command help.
+    // - `--<root> value [value...]`:
+    //   - if a root value handler is set, it is invoked.
+    //   - if no root value handler is set, parsing reports an unknown value error.
+    void SetRootValueHandler(ValueHandler handler);
+    // Optional inline root value help line shown by bare `--<root>`.
+    // Example:
+    //   SetRootValueHandler(handler, "<selector>",
+    //                       "Enable trace channel(s) (may pass more than once)");
+    void SetRootValueHandler(ValueHandler handler,
+                             std::string_view value_usage,
+                             std::string_view description);
+    void ClearRootValueHandler();
+    bool HasRootValueHandler() const;
 
     // Register a short alias (for example "-p" -> "output").
     // Hard rules:

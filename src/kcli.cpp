@@ -125,6 +125,36 @@ bool Parser::HasCommand(std::string_view command) const {
     return impl_->HasCommand(command);
 }
 
+void Parser::SetRootValueHandler(ValueHandler handler) {
+    if (impl_ == nullptr) {
+        throw std::logic_error("kcli::Parser is in a moved-from state");
+    }
+    impl_->SetRootValueHandler(std::move(handler));
+}
+
+void Parser::SetRootValueHandler(ValueHandler handler,
+                                 std::string_view value_usage,
+                                 std::string_view description) {
+    if (impl_ == nullptr) {
+        throw std::logic_error("kcli::Parser is in a moved-from state");
+    }
+    impl_->SetRootValueHandler(std::move(handler), value_usage, description);
+}
+
+void Parser::ClearRootValueHandler() {
+    if (impl_ == nullptr) {
+        throw std::logic_error("kcli::Parser is in a moved-from state");
+    }
+    impl_->ClearRootValueHandler();
+}
+
+bool Parser::HasRootValueHandler() const {
+    if (impl_ == nullptr) {
+        throw std::logic_error("kcli::Parser is in a moved-from state");
+    }
+    return impl_->HasRootValueHandler();
+}
+
 bool Parser::AddAlias(std::string_view alias, std::string_view command) {
     if (impl_ == nullptr) {
         throw std::logic_error("kcli::Parser is in a moved-from state");
