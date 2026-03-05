@@ -91,7 +91,7 @@ public:
     void Initialize(int& argc, char** argv);
 
     // Inline mode: handles only --<root> and --<root>-* options.
-    // Root accepts either "trace" or "--trace" forms.
+    // Root must be a bare token (for example "trace"), not "--trace".
     void Initialize(int& argc, char** argv, std::string_view root);
 
     void Reset();

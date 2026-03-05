@@ -34,13 +34,8 @@ std::string NormalizeRootNameOrThrow(std::string_view raw_root) {
         throw std::invalid_argument("kcli root must not be empty");
     }
 
-    if (StartsWith(root, "--")) {
-        if (root.size() == 2) {
-            throw std::invalid_argument("kcli root '--' is invalid");
-        }
-        root.erase(0, 2);
-    } else if (root.front() == '-') {
-        throw std::invalid_argument("kcli root must begin with '--' or no dashes");
+    if (root.front() == '-') {
+        throw std::invalid_argument("kcli root must not begin with '-'");
     }
 
     if (root.empty() || ContainsWhitespace(root)) {
