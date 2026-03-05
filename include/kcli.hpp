@@ -3,6 +3,7 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace kcli {
 
@@ -47,6 +48,11 @@ struct HandlerContext {
     std::string_view root{};
     std::string_view option{};
     std::string_view command{};
+    // Shell-tokenized value parts consumed for this option.
+    // Examples:
+    // - --alpha-message "hey bud"  => {"hey bud"}
+    // - --alpha-message hey bud    => {"hey", "bud"}
+    std::vector<std::string_view> value_tokens{};
     bool from_alias = false;
     int option_index = -1;
 };

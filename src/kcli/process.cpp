@@ -20,6 +20,28 @@ bool IsUsableValueToken(std::string_view value, bool reject_dash_prefixed) {
     return true;
 }
 
+std::string JoinWithSpaces(const std::vector<std::string>& parts) {
+    if (parts.empty()) {
+        return {};
+    }
+
+    std::size_t total = 0;
+    for (const std::string& part : parts) {
+        total += part.size();
+    }
+    total += parts.size() - 1;
+
+    std::string joined;
+    joined.reserve(total);
+    for (std::size_t i = 0; i < parts.size(); ++i) {
+        if (i > 0) {
+            joined.push_back(' ');
+        }
+        joined.append(parts[i]);
+    }
+    return joined;
+}
+
 } // namespace
 
 namespace kcli {
@@ -105,6 +127,7 @@ bool Parser::Impl::dispatchCommand(const std::string& command,
     context.root = root_name;
     context.option = option_token;
     context.command = command;
+    context.value_tokens.clear();
     context.from_alias = from_alias;
     context.option_index = i;
 
@@ -124,18 +147,53 @@ bool Parser::Impl::dispatchCommand(const std::string& command,
         }
 
         std::string value{};
-        const int value_index = i + 1;
-        const bool has_next =
-            value_index < argc &&
-            value_index >= 0 &&
-            argv != nullptr &&
-            argv[value_index] != nullptr &&
-            !consumed[static_cast<std::size_t>(value_index)];
-
         bool has_value = false;
+        std::vector<std::string> value_parts;
+        int last_value_index = i;
+
+        const int first_value_index = i + 1;
+        const bool has_next =
+            first_value_index < argc &&
+            first_value_index >= 0 &&
+            argv != nullptr &&
+            argv[first_value_index] != nullptr &&
+            !consumed[static_cast<std::size_t>(first_value_index)];
+
         if (has_next) {
-            value = detail::TrimWhitespace(std::string_view(argv[value_index]));
-            has_value = IsUsableValueToken(value, policy.reject_dash_prefixed_values);
+            const std::string first = detail::TrimWhitespace(std::string_view(argv[first_value_index]));
+            if (IsUsableValueToken(first, policy.reject_dash_prefixed_values)) {
+                has_value = true;
+                value_parts.push_back(first);
+                consumed[static_cast<std::size_t>(first_value_index)] = true;
+                result.stats.consumed_values++;
+                last_value_index = first_value_index;
+
+                // Default behavior: consume additional contiguous non-option
+                // tokens as part of the same value.
+                for (int scan = first_value_index + 1; scan < argc; ++scan) {
+                    if (argv[scan] == nullptr) {
+                        break;
+                    }
+                    if (consumed[static_cast<std::size_t>(scan)]) {
+                        continue;
+                    }
+
+                    const std::string next = detail::TrimWhitespace(std::string_view(argv[scan]));
+                    if (next.empty()) {
+                        break;
+                    }
+                    if (next.front() == '-') {
+                        break;
+                    }
+
+                    value_parts.push_back(next);
+                    consumed[static_cast<std::size_t>(scan)] = true;
+                    result.stats.consumed_values++;
+                    last_value_index = scan;
+                }
+
+                value = JoinWithSpaces(value_parts);
+            }
         }
 
         if (!has_value && binding.value_mode == ValueMode::Required) {
@@ -146,14 +204,16 @@ bool Parser::Impl::dispatchCommand(const std::string& command,
         }
 
         if (has_value) {
-            consumed[static_cast<std::size_t>(value_index)] = true;
-            result.stats.consumed_values++;
-            ++i;
+            i = last_value_index;
         } else {
             value.clear();
         }
 
         if (binding.value_handler) {
+            context.value_tokens.reserve(value_parts.size());
+            for (const std::string& token : value_parts) {
+                context.value_tokens.push_back(token);
+            }
             binding.value_handler(context, value);
         }
         return true;

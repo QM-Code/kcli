@@ -5,37 +5,67 @@
 
 #include <iostream>
 #include <string>
+#include <string_view>
 
 namespace {
 
-std::string g_build_profile = "dev";
-bool g_build_clean = false;
-bool g_verbose = false;
-std::string g_output = "stdout";
+std::string ExecutableName(const char* path) {
+    if (path == nullptr || path[0] == '\0') {
+        return "app";
+    }
+    return std::string(path);
+}
 
-void handleBuildProfile(const kcli::HandlerContext&, std::string_view value) {
-    g_build_profile = std::string(value);
+bool IsRootTokenOrSubcommand(std::string_view arg, std::string_view root) {
+    const std::string root_token = std::string("--") + std::string(root);
+    if (arg == root_token) {
+        return true;
+    }
+    const std::string root_prefix = root_token + "-";
+    return arg.rfind(root_prefix, 0) == 0;
+}
+
+bool HasInlineRootArgs(int argc, char** argv) {
+    if (argc <= 1 || argv == nullptr) {
+        return false;
+    }
+    for (int i = 1; i < argc; ++i) {
+        if (argv[i] == nullptr) {
+            continue;
+        }
+        const std::string_view arg(argv[i]);
+        if (IsRootTokenOrSubcommand(arg, "alpha") ||
+            IsRootTokenOrSubcommand(arg, "beta") ||
+            IsRootTokenOrSubcommand(arg, "renamed")) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void handleBuildProfile(const kcli::HandlerContext&, std::string_view) {
 }
 
 void handleBuildClean(const kcli::HandlerContext&) {
-    g_build_clean = true;
 }
 
 void handleVerbose(const kcli::HandlerContext&) {
-    g_verbose = true;
 }
 
-void handleOutput(const kcli::HandlerContext&, std::string_view value) {
-    g_output = std::string(value);
+void handleOutput(const kcli::HandlerContext&, std::string_view) {
 }
 
 } // namespace
 
 int main(int argc, char** argv) {
+    const std::string exe_name = ExecutableName((argc > 0) ? argv[0] : nullptr);
+    const bool requested_inline_roots = HasInlineRootArgs(argc, argv);
+
     // Imported libraries consume their own inline namespaces.
     kcli::demo::alpha::ProcessCLI(argc, argv);
     kcli::demo::beta::ProcessCLI(argc, argv);
-    kcli::demo::gamma::ProcessCLI(argc, argv, "runtime");
+    // Explicit root override: gamma's default root ("gamma") is replaced with "renamed".
+    kcli::demo::gamma::ProcessCLI(argc, argv, "renamed");
 
     // App-defined inline namespace group (for example --build-*).
     kcli::Parser build;
@@ -59,15 +89,16 @@ int main(int argc, char** argv) {
     cli.AddAlias("-out", "output");
     cli.Process();
 
-    // Library symbols are reachable from the app.
-    kcli::demo::alpha::EmitDemoOutput();
-    kcli::demo::beta::EmitDemoOutput();
-    kcli::demo::gamma::EmitDemoOutput();
+    if (requested_inline_roots) {
+        return 0;
+    }
 
-    std::cout << "[app] build_profile='" << g_build_profile
-              << "', build_clean=" << std::boolalpha << g_build_clean
-              << ", verbose=" << g_verbose
-              << ", output='" << g_output << "'\n";
-    std::cout << "KCLI demo executable compile/link/integration check passed\n";
+    std::cout << "\nKCLI demo executable compile/link/integration check passed\n\n";
+    std::cout << "Usage:\n";
+    std::cout << "  " << exe_name << " --<root>\n\n";
+    std::cout << "Enabled --<root> prefixes:\n";
+    std::cout << "  --alpha\n";
+    std::cout << "  --beta\n";
+    std::cout << "  --renamed (gamma override)\n\n";
     return 0;
 }
