@@ -20,6 +20,8 @@ target_include_directories(kcli_sdk
         $<INSTALL_INTERFACE:include>
 )
 
+target_link_libraries(kcli_sdk PUBLIC spdlog::spdlog)
+
 set_target_properties(kcli_sdk PROPERTIES
     OUTPUT_NAME kcli
     EXPORT_NAME sdk

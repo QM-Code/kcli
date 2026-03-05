@@ -1,5 +1,7 @@
 {
   "name": "kcli",
-  "dependencies": [],
+  "dependencies": [
+    "spdlog"
+  ],
   "builtin-baseline": "c01dc6ea7353758f2ed70df0bc29c97dfc650b3a"
 }

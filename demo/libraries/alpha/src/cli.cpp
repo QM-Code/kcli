@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 
 namespace {
@@ -60,7 +61,13 @@ void ProcessCLI(int& argc, char** argv, std::string_view root) {
                   handleEnable,
                   "Enable alpha processing.",
                   kcli::ValueMode::Optional);
-    cli.Process();
+    const kcli::ProcessResult result = cli.Process();
+    if (!result) {
+        const std::string message = result.error_message.empty()
+                                        ? "alpha CLI parse failed"
+                                        : ("alpha CLI parse error: " + result.error_message);
+        throw std::runtime_error(message);
+    }
 }
 
 void EmitDemoOutput() {

@@ -14,7 +14,9 @@
 		}
 	},
 	"vcpkg": {
-		"dependencies": []
+		"dependencies": [
+			"spdlog"
+		]
 	},
     "build" : {
         "defaults": {

@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 
 namespace {
@@ -60,7 +61,13 @@ void ProcessCLI(int& argc, char** argv, std::string_view root) {
                   handleTag,
                   "Set a gamma tag label.",
                   kcli::ValueMode::Required);
-    cli.Process();
+    const kcli::ProcessResult result = cli.Process();
+    if (!result) {
+        const std::string message = result.error_message.empty()
+                                        ? "gamma CLI parse failed"
+                                        : ("gamma CLI parse error: " + result.error_message);
+        throw std::runtime_error(message);
+    }
 }
 
 void EmitDemoOutput() {

@@ -2,8 +2,11 @@
 #include <beta/sdk.hpp>
 #include <gamma/sdk.hpp>
 #include <kcli.hpp>
+#include <spdlog/spdlog.h>
 
+#include <exception>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 
@@ -58,36 +61,53 @@ void handleOutput(const kcli::HandlerContext&, std::string_view) {
 } // namespace
 
 int main(int argc, char** argv) {
+    spdlog::set_pattern("[%^%l%$] %v");
+
     const std::string exe_name = ExecutableName((argc > 0) ? argv[0] : nullptr);
     const bool requested_inline_roots = HasInlineRootArgs(argc, argv);
 
-    // Imported libraries consume their own inline namespaces.
-    kcli::demo::alpha::ProcessCLI(argc, argv);
-    kcli::demo::beta::ProcessCLI(argc, argv);
-    // Explicit root override: gamma's default root ("gamma") is replaced with "renamed".
-    kcli::demo::gamma::ProcessCLI(argc, argv, "renamed");
+    try {
+        // Imported libraries consume their own inline namespaces.
+        kcli::demo::alpha::ProcessCLI(argc, argv);
+        kcli::demo::beta::ProcessCLI(argc, argv);
+        // Explicit root override: gamma's default root ("gamma") is replaced with "renamed".
+        kcli::demo::gamma::ProcessCLI(argc, argv, "renamed");
 
-    // App-defined inline namespace group (for example --build-*).
-    kcli::Parser build;
-    build.Initialize(argc, argv, "build");
-    build.Implement("profile",
-                    handleBuildProfile,
-                    "Set build profile.",
-                    kcli::ValueMode::Required);
-    build.Implement("clean", handleBuildClean, "Enable clean build.");
-    build.Process();
+        // App-defined inline namespace group (for example --build-*).
+        kcli::Parser build;
+        build.Initialize(argc, argv, "build");
+        build.Implement("profile",
+                        handleBuildProfile,
+                        "Set build profile.",
+                        kcli::ValueMode::Required);
+        build.Implement("clean", handleBuildClean, "Enable clean build.");
+        const kcli::ProcessResult build_result = build.Process();
+        if (!build_result) {
+            throw std::runtime_error(build_result.error_message.empty()
+                                         ? "build parser failed"
+                                         : build_result.error_message);
+        }
 
-    // App-defined end-user options.
-    kcli::Parser cli;
-    cli.Initialize(argc, argv);
-    cli.Implement("verbose", handleVerbose, "Enable verbose app logging.");
-    cli.Implement("output",
-                  handleOutput,
-                  "Set app output target.",
-                  kcli::ValueMode::Required);
-    cli.AddAlias("-v", "verbose");
-    cli.AddAlias("-out", "output");
-    cli.Process();
+        // App-defined end-user options.
+        kcli::Parser cli;
+        cli.Initialize(argc, argv);
+        cli.Implement("verbose", handleVerbose, "Enable verbose app logging.");
+        cli.Implement("output",
+                      handleOutput,
+                      "Set app output target.",
+                      kcli::ValueMode::Required);
+        cli.AddAlias("-v", "verbose");
+        cli.AddAlias("-out", "output");
+        const kcli::ProcessResult app_result = cli.Process();
+        if (!app_result) {
+            throw std::runtime_error(app_result.error_message.empty()
+                                         ? "application parser failed"
+                                         : app_result.error_message);
+        }
+    } catch (const std::exception& ex) {
+        spdlog::error("CLI error: {}", ex.what());
+        return 2;
+    }
 
     if (requested_inline_roots) {
         return 0;
