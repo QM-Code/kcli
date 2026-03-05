@@ -3,5 +3,5 @@
   "dependencies": [
     "spdlog"
   ],
-  "builtin-baseline": "c01dc6ea7353758f2ed70df0bc29c97dfc650b3a"
+  "builtin-baseline": "62159a45e18f3a9ac0548628dcaf74fcb60c6ff9"
 }

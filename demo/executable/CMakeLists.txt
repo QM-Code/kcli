@@ -1,4 +1,7 @@
-cmake_minimum_required(VERSION 3.20)
+if(NOT DEFINED KTOOLS_CMAKE_MINIMUM_VERSION OR KTOOLS_CMAKE_MINIMUM_VERSION STREQUAL "")
+    set(KTOOLS_CMAKE_MINIMUM_VERSION "3.20")
+endif()
+cmake_minimum_required(VERSION ${KTOOLS_CMAKE_MINIMUM_VERSION})
 
 project(kcli_demo_executable LANGUAGES CXX)
 

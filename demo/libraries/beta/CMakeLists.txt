@@ -1,4 +1,7 @@
-cmake_minimum_required(VERSION 3.20)
+if(NOT DEFINED KTOOLS_CMAKE_MINIMUM_VERSION OR KTOOLS_CMAKE_MINIMUM_VERSION STREQUAL "")
+    set(KTOOLS_CMAKE_MINIMUM_VERSION "3.20")
+endif()
+cmake_minimum_required(VERSION ${KTOOLS_CMAKE_MINIMUM_VERSION})
 
 project(beta VERSION 0.1.0 LANGUAGES CXX)
 
@@ -68,3 +71,8 @@ install(FILES
     DESTINATION lib/cmake/BetaSDK
     COMPONENT BetaSDK
 )
+
+include(CTest)
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/cmake/tests/CMakeLists.txt")
+    add_subdirectory(cmake/tests)
+endif()

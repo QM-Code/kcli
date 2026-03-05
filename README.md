@@ -26,9 +26,9 @@ SDK output:
 ```
 
 Demos:
+- Bootstrap compile/link check: `demo/bootstrap/`
 - Libraries: `demo/libraries/{alpha,beta,gamma}`
 - Executable: `demo/executable/`
-- Bootstrap compile/link check: `demo/bootstrap/`
 
 Demo builds are orchestrated by the root `kbuild.py`.
 
