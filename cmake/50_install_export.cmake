@@ -2,7 +2,15 @@ include(CMakePackageConfigHelpers)
 
 set(KTOOLS_INSTALL_CMAKEDIR "lib/cmake/KcliSDK")
 
-install(TARGETS kcli_sdk
+set(_kcli_install_targets)
+if(TARGET kcli_sdk_static)
+    list(APPEND _kcli_install_targets kcli_sdk_static)
+endif()
+if(TARGET kcli_sdk_shared)
+    list(APPEND _kcli_install_targets kcli_sdk_shared)
+endif()
+
+install(TARGETS ${_kcli_install_targets}
     EXPORT KcliSDKTargets
     ARCHIVE DESTINATION lib COMPONENT KcliSDK
     LIBRARY DESTINATION lib COMPONENT KcliSDK
