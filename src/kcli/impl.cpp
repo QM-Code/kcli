@@ -14,6 +14,7 @@ void Reset(ParseState& state) {
     state.mode = Mode::EndUser;
     state.root_name.clear();
     state.policy = ParsePolicy{};
+    state.root_value_handler = ValueHandler{};
     state.commands.clear();
     state.command_order.clear();
 }
@@ -42,6 +43,14 @@ std::string GetRoot(const ParseState& state) {
 
 void SetPolicy(ParseState& state, const ParsePolicy& policy) {
     state.policy = policy;
+}
+
+void SetRootValueHandler(ParseState& state, ValueHandler handler) {
+    if (!handler) {
+        throw std::invalid_argument("kcli root value handler must not be empty");
+    }
+
+    state.root_value_handler = std::move(handler);
 }
 
 void Implement(ParseState& state,

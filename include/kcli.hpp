@@ -96,6 +96,7 @@ struct SessionOptions {
 // Procedural parse-session API.
 void Initialize(int& argc, char** argv, const SessionOptions& options = {});
 bool ExpandAlias(std::string_view alias, std::string_view target);
+void SetRootValueHandler(ValueHandler handler);
 void SetHandler(std::string_view option,
                 FlagHandler handler,
                 std::string_view description);

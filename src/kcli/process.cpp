@@ -357,9 +357,34 @@ kcli::ProcessResult ProcessInline(ParseState& state) {
                 continue;
             }
 
-            ReportError(result,
-                        root_option,
-                        "unknown value for option '" + root_option + "'");
+            if (!state.root_value_handler) {
+                ReportError(result,
+                            root_option,
+                            "unknown value for option '" + root_option + "'");
+                continue;
+            }
+
+            kcli::HandlerContext context{};
+            context.mode = state.mode;
+            context.root = state.root_name;
+            context.option = root_option;
+            context.command = "";
+            context.from_alias = false;
+            context.option_index = option_index;
+            context.value_tokens.reserve(collected.parts.size());
+            for (const std::string& token : collected.parts) {
+                context.value_tokens.push_back(token);
+            }
+
+            try {
+                state.root_value_handler(context, JoinWithSpaces(collected.parts));
+            } catch (const std::exception& ex) {
+                ReportError(result, root_option, ex.what());
+            } catch (...) {
+                ReportError(result,
+                            root_option,
+                            "unknown exception while handling option");
+            }
             continue;
         }
 

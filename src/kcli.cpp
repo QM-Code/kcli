@@ -259,6 +259,15 @@ bool ExpandAlias(std::string_view alias, std::string_view target) {
     return replaced;
 }
 
+void SetRootValueHandler(ValueHandler handler) {
+    SessionState& state = RequireSession();
+    if (!backend::IsInlineMode(state.parse)) {
+        throw std::logic_error("kcli::SetRootValueHandler is only valid in inline mode");
+    }
+
+    backend::SetRootValueHandler(state.parse, std::move(handler));
+}
+
 void SetHandler(std::string_view option,
                 FlagHandler handler,
                 std::string_view description) {

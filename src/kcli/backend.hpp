@@ -24,6 +24,7 @@ struct ParseState {
     Mode mode = Mode::EndUser;
     std::string root_name{};
     ParsePolicy policy{};
+    ValueHandler root_value_handler{};
 
     std::unordered_map<std::string, CommandBinding> commands;
     std::vector<std::string> command_order;
@@ -35,6 +36,7 @@ void Initialize(ParseState& state, int& argc, char** argv, std::string_view root
 bool IsInlineMode(const ParseState& state);
 std::string GetRoot(const ParseState& state);
 void SetPolicy(ParseState& state, const ParsePolicy& policy);
+void SetRootValueHandler(ParseState& state, ValueHandler handler);
 void Implement(ParseState& state,
                std::string_view command,
                FlagHandler handler,
