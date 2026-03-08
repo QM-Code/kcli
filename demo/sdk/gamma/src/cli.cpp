@@ -50,24 +50,22 @@ void handleTag(const kcli::HandlerContext& context, std::string_view value) {
 
 namespace kcli::demo::gamma {
 
-void ProcessCLI(int& argc, char** argv, std::string_view root) {
-    kcli::Parser cli;
-    cli.Initialize(argc, argv, root);
-    cli.Implement("strict",
-                  handleStrict,
-                  "Enable strict gamma mode.",
-                  kcli::ValueMode::Optional);
-    cli.Implement("tag",
-                  handleTag,
-                  "Set a gamma tag label.",
-                  kcli::ValueMode::Required);
-    const kcli::ProcessResult result = cli.Process();
-    if (!result) {
-        const std::string message = result.error_message.empty()
-                                        ? "gamma CLI parse failed"
-                                        : ("gamma CLI parse error: " + result.error_message);
-        throw std::runtime_error(message);
+ProcessResult ProcessCLI(int& argc, char** argv, const SessionOptions& options) {
+    SessionOptions effective_options = options;
+    if (effective_options.root.empty()) {
+        effective_options.root = "--gamma";
     }
+
+    kcli::Initialize(argc, argv, effective_options);
+    kcli::SetHandler("-strict",
+                     handleStrict,
+                     "Enable strict gamma mode.",
+                     kcli::ValueMode::Optional);
+    kcli::SetHandler("-tag",
+                     handleTag,
+                     "Set a gamma tag label.",
+                     kcli::ValueMode::Required);
+    return kcli::Process();
 }
 
 void EmitDemoOutput() {

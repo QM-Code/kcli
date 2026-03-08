@@ -8,6 +8,10 @@ usage() {
     echo "  unknown_beta_option"
     echo "  unknown_renamed_option"
     echo "  known_alpha_option"
+    echo "  unknown_app_option"
+    echo "  known_and_unknown_option"
+    echo "  alpha_alias_option"
+    echo "  positional_args"
 }
 
 if [[ $# -ne 2 ]]; then
@@ -105,6 +109,49 @@ case "$test_case" in
             exit 1
         fi
         require_contains "$output" "Processing --alpha-message with value \"hello\""
+        require_not_contains "$output" "CLI error:"
+        ;;
+    unknown_app_option)
+        run_and_split --bogus
+        if [[ "$status" -eq 0 ]]; then
+            echo "Expected non-zero exit status for unknown app option" >&2
+            exit 1
+        fi
+        require_contains "$output" "CLI error: unknown option --bogus"
+        require_not_contains "$output" "KCLI demo omega compile/link/integration check passed"
+        ;;
+    known_and_unknown_option)
+        run_and_split --alpha-message hello --bogus
+        if [[ "$status" -eq 0 ]]; then
+            echo "Expected non-zero exit status when mixing known and unknown options" >&2
+            exit 1
+        fi
+        require_contains "$output" "Processing --alpha-message with value \"hello\""
+        require_contains "$output" "CLI error: unknown option --bogus"
+        require_not_contains "$output" "KCLI demo omega compile/link/integration check passed"
+        ;;
+    alpha_alias_option)
+        run_and_split -a
+        if [[ "$status" -ne 0 ]]; then
+            echo "Expected zero exit status for alpha alias option" >&2
+            echo "--- output begin ---" >&2
+            echo "$output" >&2
+            echo "--- output end ---" >&2
+            exit 1
+        fi
+        require_contains "$output" "Processing --alpha-enable"
+        require_not_contains "$output" "CLI error:"
+        ;;
+    positional_args)
+        run_and_split input-a input-b
+        if [[ "$status" -ne 0 ]]; then
+            echo "Expected zero exit status for positional arguments" >&2
+            echo "--- output begin ---" >&2
+            echo "$output" >&2
+            echo "--- output end ---" >&2
+            exit 1
+        fi
+        require_contains "$output" "KCLI demo omega compile/link/integration check passed"
         require_not_contains "$output" "CLI error:"
         ;;
     *)

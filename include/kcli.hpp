@@ -59,9 +59,17 @@ struct HandlerContext {
 
 using FlagHandler = std::function<void(const HandlerContext&)>;
 using ValueHandler = std::function<void(const HandlerContext&, std::string_view)>;
+// Positional handlers receive remaining positional tokens in
+// HandlerContext::value_tokens.
+using PositionalHandler = std::function<void(const HandlerContext&)>;
 using UnknownOptionHandler = std::function<void(std::string_view option)>;
 using ErrorHandler = std::function<void(std::string_view message)>;
 using WarningHandler = std::function<void(std::string_view message)>;
+
+enum class FailureMode {
+    Return,
+    Throw,
+};
 
 struct ProcessStats {
     int consumed_options = 0;
@@ -78,83 +86,26 @@ struct ProcessResult {
     explicit operator bool() const noexcept { return ok; }
 };
 
-class Parser {
-public:
-    Parser();
-    ~Parser();
-    Parser(const Parser&) = delete;
-    Parser& operator=(const Parser&) = delete;
-    Parser(Parser&&) noexcept;
-    Parser& operator=(Parser&&) noexcept;
-
-    // End-user mode (default): handles non-namespaced options.
-    void Initialize(int& argc, char** argv);
-
-    // Inline mode: handles only --<root> and --<root>-* options.
-    // Root must be a bare token (for example "trace"), not "--trace".
-    void Initialize(int& argc, char** argv, std::string_view root);
-
-    void Reset();
-
-    Mode GetMode() const;
-    bool IsInlineMode() const;
-    bool IsEndUserMode() const;
-    std::string GetRoot() const;
-
-    void SetPolicy(const ParsePolicy& policy);
-    ParsePolicy GetPolicy() const;
-
-    // In EndUser mode, command maps to --<command>.
-    // In Inline mode, command maps to --<root>-<command>.
-    // Description is required and is used when printing inline root help.
-    void Implement(std::string_view command,
-                   FlagHandler handler,
-                   std::string_view description);
-    void Implement(std::string_view command,
-                   ValueHandler handler,
-                   std::string_view description,
-                   ValueMode mode = ValueMode::Required);
-    void Remove(std::string_view command);
-    bool HasCommand(std::string_view command) const;
-
-    // Inline mode: plain --<root> is reserved and always prints the registered
-    // --<root>-<command> options with their descriptions.
-    // EndUser mode: this behavior does not apply.
-    //
-    // Optional inline root value handler:
-    // - `--<root>` with no value: always prints --<root>-* command help.
-    // - `--<root> value [value...]`:
-    //   - if a root value handler is set, it is invoked.
-    //   - if no root value handler is set, parsing reports an unknown value error.
-    void SetRootValueHandler(ValueHandler handler);
-    // Optional inline root value help line shown by bare `--<root>`.
-    // Example:
-    //   SetRootValueHandler(handler, "<selector>",
-    //                       "Enable trace channel(s) (may pass more than once)");
-    void SetRootValueHandler(ValueHandler handler,
-                             std::string_view value_usage,
-                             std::string_view description);
-    void ClearRootValueHandler();
-    bool HasRootValueHandler() const;
-
-    // Register a short alias (for example "-p" -> "output").
-    // Hard rules:
-    // - alias must be single-dash form (for example "-p"), never "--...".
-    // - command must already be registered via Implement() (without dashes).
-    // - inline mode is not allowed to register aliases and must throw
-    //   std::logic_error when called.
-    bool AddAlias(std::string_view alias, std::string_view command);
-    bool RemoveAlias(std::string_view alias);
-
-    void SetUnknownOptionHandler(UnknownOptionHandler handler);
-    void SetErrorHandler(ErrorHandler handler);
-    void SetWarningHandler(WarningHandler handler);
-
-    ProcessResult Process();
-
-private:
-    struct Impl;
-    Impl* impl_ = nullptr;
+struct SessionOptions {
+    // Empty root selects end-user mode. Accepts either "build" or "--build".
+    std::string_view root{};
+    FailureMode failure_mode = FailureMode::Return;
+    ParsePolicy policy{};
 };
+
+// Procedural parse-session API.
+void Initialize(int& argc, char** argv, const SessionOptions& options = {});
+bool ExpandAlias(std::string_view alias, std::string_view target);
+void SetHandler(std::string_view option,
+                FlagHandler handler,
+                std::string_view description);
+void SetHandler(std::string_view option,
+                ValueHandler handler,
+                std::string_view description,
+                ValueMode mode = ValueMode::Required);
+void SetPositionalHandler(PositionalHandler handler);
+void ClearPositionalHandler();
+ProcessResult Process();
+ProcessResult FailOnUnknown();
 
 }  // namespace kcli

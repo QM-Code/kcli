@@ -1,10 +1,10 @@
 #pragma once
 
-#include <string_view>
+#include <kcli.hpp>
 
 namespace kcli::demo::beta {
 
-void ProcessCLI(int& argc, char** argv, std::string_view root = "beta");
+ProcessResult ProcessCLI(int& argc, char** argv, const SessionOptions& options = {});
 void EmitDemoOutput();
 
 } // namespace kcli::demo::beta

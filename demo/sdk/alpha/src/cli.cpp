@@ -50,24 +50,22 @@ void handleEnable(const kcli::HandlerContext& context, std::string_view value) {
 
 namespace kcli::demo::alpha {
 
-void ProcessCLI(int& argc, char** argv, std::string_view root) {
-    kcli::Parser cli;
-    cli.Initialize(argc, argv, root);
-    cli.Implement("message",
-                  handleMessage,
-                  "Set the alpha message label.",
-                  kcli::ValueMode::Required);
-    cli.Implement("enable",
-                  handleEnable,
-                  "Enable alpha processing.",
-                  kcli::ValueMode::Optional);
-    const kcli::ProcessResult result = cli.Process();
-    if (!result) {
-        const std::string message = result.error_message.empty()
-                                        ? "alpha CLI parse failed"
-                                        : ("alpha CLI parse error: " + result.error_message);
-        throw std::runtime_error(message);
+ProcessResult ProcessCLI(int& argc, char** argv, const SessionOptions& options) {
+    SessionOptions effective_options = options;
+    if (effective_options.root.empty()) {
+        effective_options.root = "--alpha";
     }
+
+    kcli::Initialize(argc, argv, effective_options);
+    kcli::SetHandler("-message",
+                     handleMessage,
+                     "Set the alpha message label.",
+                     kcli::ValueMode::Required);
+    kcli::SetHandler("-enable",
+                     handleEnable,
+                     "Enable alpha processing.",
+                     kcli::ValueMode::Optional);
+    return kcli::Process();
 }
 
 void EmitDemoOutput() {
