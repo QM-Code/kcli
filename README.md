@@ -5,7 +5,7 @@ Standalone CLI parsing SDK used by `ktrace` and `kconfig`.
 ## Build SDK
 
 ```bash
-./kbuild.py
+./kbuild.py --build-latest
 ```
 
 SDK output:
@@ -17,30 +17,31 @@ SDK output:
 
 ```bash
 # Builds SDK plus kbuild.json "build.defaults.demos".
-./kbuild.py
+./kbuild.py --build-latest
 
 # Explicit demo-only run (uses build.demos when no args are provided).
 ./kbuild.py --build-demos
 
-./demo/executable/build/latest/test
+./demo/exe/core/build/latest/test
 ```
 
 Demos:
 - Bootstrap compile/link check: `demo/bootstrap/`
-- Libraries: `demo/libraries/{alpha,beta,gamma}`
-- Executable: `demo/executable/`
+- SDKs: `demo/sdk/{alpha,beta,gamma}`
+- Executables: `demo/exe/{core,omega}`
 
 Demo builds are orchestrated by the root `kbuild.py`.
 
 Useful demo commands:
 
 ```bash
-./demo/executable/build/latest/test
-./demo/executable/build/latest/test --alpha
-./demo/executable/build/latest/test --alpha-message "hello"
-./demo/executable/build/latest/test --beta-workers 8
-./demo/executable/build/latest/test --renamed-tag "prod"
-./demo/executable/build/latest/test --alpha-d
+./demo/exe/core/build/latest/test
+./demo/exe/core/build/latest/test --alpha
+./demo/exe/core/build/latest/test --alpha-message "hello"
+./demo/exe/core/build/latest/test --output stdout
+./demo/exe/omega/build/latest/test --beta-workers 8
+./demo/exe/omega/build/latest/test --renamed-tag "prod"
+./demo/exe/omega/build/latest/test --alpha-d
 ```
 
 ## Parser Modes

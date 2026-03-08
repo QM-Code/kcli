@@ -75,7 +75,7 @@ case "$test_case" in
             exit 1
         fi
         require_contains "$output" "unknown option --alpha-d (use --alpha to list options)"
-        require_not_contains "$output" "KCLI demo executable compile/link/integration check passed"
+        require_not_contains "$output" "KCLI demo omega compile/link/integration check passed"
         ;;
     unknown_beta_option)
         run_and_split --beta-z
@@ -84,7 +84,7 @@ case "$test_case" in
             exit 1
         fi
         require_contains "$output" "unknown option --beta-z (use --beta to list options)"
-        require_not_contains "$output" "KCLI demo executable compile/link/integration check passed"
+        require_not_contains "$output" "KCLI demo omega compile/link/integration check passed"
         ;;
     unknown_renamed_option)
         run_and_split --renamed-wut
@@ -93,7 +93,7 @@ case "$test_case" in
             exit 1
         fi
         require_contains "$output" "unknown option --renamed-wut (use --renamed to list options)"
-        require_not_contains "$output" "KCLI demo executable compile/link/integration check passed"
+        require_not_contains "$output" "KCLI demo omega compile/link/integration check passed"
         ;;
     known_alpha_option)
         run_and_split --alpha-message hello

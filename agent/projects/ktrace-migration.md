@@ -13,7 +13,7 @@ This checklist captures agreed migration policy before swapping `ktrace` CLI par
 
 ## Decisions (Closed)
 
-- [x] Exit code for CLI parse failure in `ktrace` demo/executable: `2`.
+- [x] Exit code for CLI parse failure in `ktrace` demo/exe/omega: `2`.
 - [x] Root literal style in source code: bare root (`"trace"`, `"config"`).
   - `kcli::Parser::Initialize(..., root)` normalization remains compatible with either form.
 

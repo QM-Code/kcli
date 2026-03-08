@@ -113,7 +113,7 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    std::cout << "\nKCLI demo executable compile/link/integration check passed\n\n";
+    std::cout << "\nKCLI demo omega compile/link/integration check passed\n\n";
     std::cout << "Usage:\n";
     std::cout << "  " << exe_name << " --<root>\n\n";
     std::cout << "Enabled --<root> prefixes:\n";
