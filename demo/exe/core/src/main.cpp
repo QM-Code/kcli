@@ -32,7 +32,6 @@ int main(int argc, char** argv) {
     kcli::InlineParser alphaParser = kcli::demo::alpha::GetInlineParser();
 
     try {
-        parser.setFailureMode(kcli::FailureMode::Throw);
         parser.addInlineParser(alphaParser);
 
         parser.addAlias("-v", "--verbose");
@@ -45,7 +44,7 @@ int main(int argc, char** argv) {
                           "Set app output target.",
                           kcli::ValueMode::Required);
         parser.parse(argc, argv);
-    } catch (const std::exception& ex) {
+    } catch (const kcli::CliError& ex) {
         spdlog::error("CLI error: {}", ex.what());
         return 2;
     }

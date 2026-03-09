@@ -6,6 +6,22 @@
 
 namespace kcli {
 
+CliError::CliError(std::string option, std::string message, ProcessStats stats)
+    : std::runtime_error(message.empty() ? "kcli parse failed" : message),
+      option_(std::move(option)),
+      stats_(stats) {
+}
+
+CliError::~CliError() = default;
+
+std::string_view CliError::option() const noexcept {
+    return option_;
+}
+
+const ProcessStats& CliError::stats() const noexcept {
+    return stats_;
+}
+
 InlineParser::InlineParser(std::string_view root)
     : data_(std::make_unique<detail::InlineParserData>()) {
     detail::SetInlineRoot(*data_, root);
@@ -62,10 +78,6 @@ PrimaryParser& PrimaryParser::operator=(PrimaryParser&& other) noexcept = defaul
 
 PrimaryParser::~PrimaryParser() = default;
 
-void PrimaryParser::setFailureMode(FailureMode failure_mode) {
-    detail::SetFailureMode(*data_, failure_mode);
-}
-
 void PrimaryParser::addAlias(std::string_view alias, std::string_view target) {
     detail::SetAlias(*data_, alias, target);
 }
@@ -91,7 +103,7 @@ void PrimaryParser::addInlineParser(InlineParser parser) {
     detail::AddInlineParser(*data_, detail::CloneInlineParserData(*parser.data_));
 }
 
-ProcessResult PrimaryParser::parse(int& argc, char** argv) {
+ProcessStats PrimaryParser::parse(int& argc, char** argv) {
     return detail::Parse(*data_, argc, argv);
 }
 

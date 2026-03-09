@@ -28,7 +28,6 @@ struct InlineParserData {
 };
 
 struct PrimaryParserData {
-    FailureMode failure_mode = FailureMode::Return;
     PositionalHandler positional_handler{};
     std::deque<std::string> owned_tokens{};
     std::vector<AliasBinding> aliases{};
@@ -50,7 +49,6 @@ void SetInlineHandler(InlineParserData& data,
                       std::string_view description,
                       ValueMode mode);
 
-void SetFailureMode(PrimaryParserData& data, FailureMode failure_mode);
 void SetAlias(PrimaryParserData& data, std::string_view alias, std::string_view target);
 void SetPrimaryHandler(PrimaryParserData& data,
                        std::string_view option,
@@ -63,6 +61,6 @@ void SetPrimaryHandler(PrimaryParserData& data,
                        ValueMode mode);
 void SetPositionalHandler(PrimaryParserData& data, PositionalHandler handler);
 void AddInlineParser(PrimaryParserData& data, InlineParserData parser);
-ProcessResult Parse(PrimaryParserData& data, int& argc, char** argv);
+ProcessStats Parse(PrimaryParserData& data, int& argc, char** argv);
 
 }  // namespace kcli::detail

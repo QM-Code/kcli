@@ -15,6 +15,7 @@ namespace {
 using kcli::detail::CommandBinding;
 using kcli::detail::InlineParserData;
 using kcli::detail::PrimaryParserData;
+using kcli::detail::ProcessResult;
 
 enum class InvocationKind {
     Flag,
@@ -87,7 +88,14 @@ std::string JoinWithSpaces(const std::vector<std::string>& parts) {
     return joined;
 }
 
-void ReportError(kcli::ProcessResult& result,
+std::string FormatOptionErrorMessage(std::string_view option, std::string_view message) {
+    if (option.empty()) {
+        return std::string(message);
+    }
+    return "option '" + std::string(option) + "': " + std::string(message);
+}
+
+void ReportError(ProcessResult& result,
                  std::string_view option,
                  std::string_view message) {
     if (result.ok) {
@@ -179,7 +187,7 @@ void PrintHelp(const Invocation& invocation) {
 }
 
 void ConsumeIndex(std::vector<bool>& consumed,
-                  kcli::ProcessResult& result,
+                  ProcessResult& result,
                   int index) {
     if (index < 0 || static_cast<std::size_t>(index) >= consumed.size()) {
         return;
@@ -251,7 +259,7 @@ bool ScheduleInvocation(const CommandBinding& binding,
                         char** argv,
                         std::vector<bool>& consumed,
                         std::vector<Invocation>& invocations,
-                        kcli::ProcessResult& result) {
+                        ProcessResult& result) {
     ConsumeIndex(consumed, result, i);
 
     Invocation invocation{};
@@ -334,7 +342,7 @@ void SchedulePositionals(const PrimaryParserData& data,
 void CompactArgv(int& argc,
                  char** argv,
                  const std::vector<bool>& consumed,
-                 kcli::ProcessResult& result) {
+                 ProcessResult& result) {
     if (argc <= 0 || argv == nullptr) {
         result.stats.remaining_argc = std::max(argc, 0);
         return;
@@ -356,7 +364,7 @@ void CompactArgv(int& argc,
 }
 
 void ExecuteInvocations(const std::vector<Invocation>& invocations,
-                       kcli::ProcessResult& result) {
+                       ProcessResult& result) {
     for (const Invocation& invocation : invocations) {
         if (!result.ok) {
             return;
@@ -393,9 +401,12 @@ void ExecuteInvocations(const std::vector<Invocation>& invocations,
                 break;
             }
         } catch (const std::exception& ex) {
-            ReportError(result, invocation.option, ex.what());
+            ReportError(result, invocation.option, FormatOptionErrorMessage(invocation.option, ex.what()));
         } catch (...) {
-            ReportError(result, invocation.option, "unknown exception while handling option");
+            ReportError(result,
+                        invocation.option,
+                        FormatOptionErrorMessage(invocation.option,
+                                                 "unknown exception while handling option"));
         }
     }
 }
@@ -404,17 +415,16 @@ void ExecuteInvocations(const std::vector<Invocation>& invocations,
 
 namespace kcli::detail {
 
-ProcessResult Parse(PrimaryParserData& data, int& argc, char** argv) {
+ProcessStats Parse(PrimaryParserData& data, int& argc, char** argv) {
     ProcessResult result{};
     if (argc > 0 && argv == nullptr) {
         result = MakeError("", "kcli received invalid argv (argc > 0 but argv is null)");
-        ApplyFailureMode(data.failure_mode, result);
-        return result;
+        ThrowCliError(result);
     }
 
     if (argc <= 0 || argv == nullptr) {
         result.stats.remaining_argc = std::max(argc, 0);
-        return result;
+        return result.stats;
     }
 
     std::vector<bool> consumed(static_cast<std::size_t>(argc), false);
@@ -567,8 +577,10 @@ ProcessResult Parse(PrimaryParserData& data, int& argc, char** argv) {
         ExecuteInvocations(invocations, result);
     }
 
-    ApplyFailureMode(data.failure_mode, result);
-    return result;
+    if (!result.ok) {
+        ThrowCliError(result);
+    }
+    return result.stats;
 }
 
 }  // namespace kcli::detail

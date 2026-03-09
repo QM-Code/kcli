@@ -90,10 +90,6 @@ void SetInlineHandler(InlineParserData& data,
     UpsertCommand(data.commands, command, MakeValueBinding(std::move(handler), description, mode));
 }
 
-void SetFailureMode(PrimaryParserData& data, FailureMode failure_mode) {
-    data.failure_mode = failure_mode;
-}
-
 void SetAlias(PrimaryParserData& data, std::string_view alias, std::string_view target) {
     const std::string normalized_alias = NormalizeAliasOrThrow(alias);
     const std::string normalized_target = NormalizeAliasTargetOrThrow(target);

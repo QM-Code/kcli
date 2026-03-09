@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -33,24 +34,23 @@ using ValueHandler = std::function<void(const HandlerContext&, std::string_view)
 // HandlerContext::value_tokens.
 using PositionalHandler = std::function<void(const HandlerContext&)>;
 
-enum class FailureMode {
-    Return,
-    Throw,
-};
-
 struct ProcessStats {
     int consumed_options = 0;
     int consumed_values = 0;
     int remaining_argc = 0;
 };
 
-struct ProcessResult {
-    bool ok = true;
-    ProcessStats stats{};
-    std::string error_option{};
-    std::string error_message{};
+class CliError : public std::runtime_error {
+public:
+    CliError(std::string option, std::string message, ProcessStats stats);
+    ~CliError() override;
 
-    explicit operator bool() const noexcept { return ok; }
+    std::string_view option() const noexcept;
+    const ProcessStats& stats() const noexcept;
+
+private:
+    std::string option_;
+    ProcessStats stats_{};
 };
 
 namespace detail {
@@ -94,8 +94,6 @@ public:
     PrimaryParser& operator=(PrimaryParser&& other) noexcept;
     ~PrimaryParser();
 
-    void setFailureMode(FailureMode failure_mode);
-
     void addAlias(std::string_view alias, std::string_view target);
 
     void setHandler(std::string_view option,
@@ -110,7 +108,7 @@ public:
 
     void addInlineParser(InlineParser parser);
 
-    ProcessResult parse(int& argc, char** argv);
+    ProcessStats parse(int& argc, char** argv);
 
 private:
     std::unique_ptr<detail::PrimaryParserData> data_;

@@ -36,8 +36,6 @@ int main(int argc, char** argv) {
     kcli::InlineParser gammaParser = kcli::demo::gamma::GetInlineParser();
     kcli::InlineParser inlineBuildParser("--build");
 
-    parser.setFailureMode(kcli::FailureMode::Throw);
-
     gammaParser.setRoot("--newgamma");
 
     parser.addInlineParser(alphaParser);
@@ -64,7 +62,7 @@ int main(int argc, char** argv) {
 
     try {
         parser.parse(argc, argv);
-    } catch (const std::exception& ex) {
+    } catch (const kcli::CliError& ex) {
         spdlog::error("CLI error: {}", ex.what());
         return 2;
     }

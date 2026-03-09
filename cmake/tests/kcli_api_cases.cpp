@@ -204,6 +204,40 @@ void AddInlineParser(kcli::PrimaryParser& parser,
     parser.addInlineParser(inline_parser);
 }
 
+struct CapturedCliError {
+    bool threw = false;
+    std::string option{};
+    std::string message{};
+    kcli::ProcessStats stats{};
+};
+
+template <typename Fn>
+CapturedCliError ExpectCliError(TestContext& t,
+                                Fn&& fn,
+                                std::string_view message) {
+    try {
+        (void)fn();
+    } catch (const kcli::CliError& ex) {
+        CapturedCliError captured{};
+        captured.threw = true;
+        captured.option = std::string(ex.option());
+        captured.message = ex.what();
+        captured.stats = ex.stats();
+        return captured;
+    } catch (const std::exception& ex) {
+        t.Expect(false, message);
+        std::cerr << "  actual exception: " << ex.what() << "\n";
+        return {};
+    } catch (...) {
+        t.Expect(false, message);
+        std::cerr << "  actual exception: non-std::exception\n";
+        return {};
+    }
+
+    t.Expect(false, message);
+    return {};
+}
+
 void CasePrimaryParserEmptyParseSucceeds(TestContext& t) {
     ArgvFixture args{"prog"};
     kcli::PrimaryParser parser;

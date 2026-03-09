@@ -148,15 +148,11 @@ ProcessResult MakeError(std::string_view option, std::string_view message) {
     return result;
 }
 
-void ApplyFailureMode(FailureMode failure_mode, const ProcessResult& result) {
-    if (result.ok || failure_mode != FailureMode::Throw) {
-        return;
+[[noreturn]] void ThrowCliError(const ProcessResult& result) {
+    if (result.ok) {
+        throw std::logic_error("kcli internal error: ThrowCliError called without a failure");
     }
-
-    if (result.error_message.empty()) {
-        throw std::runtime_error("kcli parse failed");
-    }
-    throw std::runtime_error(result.error_message);
+    throw kcli::CliError(result.error_option, result.error_message, result.stats);
 }
 
 }  // namespace kcli::detail

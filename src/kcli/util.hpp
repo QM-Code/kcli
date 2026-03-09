@@ -20,7 +20,14 @@ std::string NormalizeAliasOrThrow(std::string_view raw_alias);
 std::string NormalizeAliasTargetOrThrow(std::string_view raw_target);
 std::string NormalizeDescriptionOrThrow(std::string_view raw_description);
 
+struct ProcessResult {
+    bool ok = true;
+    ProcessStats stats{};
+    std::string error_option{};
+    std::string error_message{};
+};
+
 ProcessResult MakeError(std::string_view option, std::string_view message);
-void ApplyFailureMode(FailureMode failure_mode, const ProcessResult& result);
+[[noreturn]] void ThrowCliError(const ProcessResult& result);
 
 }  // namespace kcli::detail
