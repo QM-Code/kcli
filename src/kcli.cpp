@@ -105,7 +105,7 @@ void PrimaryParser::addInlineParser(InlineParser parser) {
     detail::AddInlineParser(*data_, detail::CloneInlineParserData(*parser.data_));
 }
 
-void PrimaryParser::parse(int& argc, char** argv) {
+void PrimaryParser::parse(int argc, char* const* argv) {
     detail::Parse(*data_, argc, argv);
 }
 

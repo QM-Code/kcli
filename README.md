@@ -81,6 +81,7 @@ Inline mode behavior:
 - Literal `--` is rejected as an unknown option; it is not treated as an option terminator.
 - Aliases are defined on the primary parser and expanded before dispatch.
 - Handlers run only after the full command line validates.
+- `parse(argc, argv)` reads the caller's argument vector without rewriting or compacting it.
 - `parse()` throws `kcli::CliError` on failure.
 
 Root token rules:

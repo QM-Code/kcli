@@ -106,8 +106,7 @@ void ReportError(ParseOutcome& result,
 }
 
 CollectedValues CollectValueTokens(int option_index,
-                                   int argc,
-                                   char** argv,
+                                   const std::vector<std::string>& tokens,
                                    std::vector<bool>& consumed,
                                    bool allow_option_like_first_value) {
     CollectedValues collected{};
@@ -115,17 +114,15 @@ CollectedValues CollectValueTokens(int option_index,
 
     const int first_value_index = option_index + 1;
     const bool has_next =
-        first_value_index < argc &&
+        first_value_index < static_cast<int>(tokens.size()) &&
         first_value_index >= 0 &&
-        argv != nullptr &&
-        argv[first_value_index] != nullptr &&
         !consumed[static_cast<std::size_t>(first_value_index)];
 
     if (!has_next) {
         return collected;
     }
 
-    const std::string first = kcli::detail::TrimWhitespace(std::string_view(argv[first_value_index]));
+    const std::string& first = tokens[static_cast<std::size_t>(first_value_index)];
     if (first.empty()) {
         return collected;
     }
@@ -142,15 +139,12 @@ CollectedValues CollectValueTokens(int option_index,
         return collected;
     }
 
-    for (int scan = first_value_index + 1; scan < argc; ++scan) {
-        if (argv[scan] == nullptr) {
-            break;
-        }
+    for (int scan = first_value_index + 1; scan < static_cast<int>(tokens.size()); ++scan) {
         if (consumed[static_cast<std::size_t>(scan)]) {
             continue;
         }
 
-        const std::string next = kcli::detail::TrimWhitespace(std::string_view(argv[scan]));
+        const std::string& next = tokens[static_cast<std::size_t>(scan)];
         if (!IsCollectableFollowOnValueToken(next)) {
             break;
         }
@@ -263,8 +257,7 @@ bool ScheduleInvocation(const CommandBinding& binding,
                         std::string_view option_token,
                         bool from_alias,
                         int& i,
-                        int argc,
-                        char** argv,
+                        const std::vector<std::string>& tokens,
                         std::vector<bool>& consumed,
                         std::vector<Invocation>& invocations,
                         ParseOutcome& result) {
@@ -292,8 +285,7 @@ bool ScheduleInvocation(const CommandBinding& binding,
     }
 
     const CollectedValues collected = CollectValueTokens(i,
-                                                         argc,
-                                                         argv,
+                                                         tokens,
                                                          consumed,
                                                          binding.value_mode == kcli::ValueMode::Required);
 
@@ -314,11 +306,10 @@ bool ScheduleInvocation(const CommandBinding& binding,
 }
 
 void SchedulePositionals(const PrimaryParserData& data,
-                        int argc,
-                        char** argv,
+                        const std::vector<std::string>& tokens,
                         std::vector<bool>& consumed,
                         std::vector<Invocation>& invocations) {
-    if (!data.positional_handler || argc <= 1 || argv == nullptr) {
+    if (!data.positional_handler || tokens.size() <= 1) {
         return;
     }
 
@@ -326,12 +317,12 @@ void SchedulePositionals(const PrimaryParserData& data,
     invocation.kind = InvocationKind::Positional;
     invocation.positional_handler = data.positional_handler;
 
-    for (int i = 1; i < argc; ++i) {
-        if (argv[i] == nullptr || consumed[static_cast<std::size_t>(i)]) {
+    for (int i = 1; i < static_cast<int>(tokens.size()); ++i) {
+        if (consumed[static_cast<std::size_t>(i)]) {
             continue;
         }
 
-        const std::string_view token(argv[i]);
+        const std::string& token = tokens[static_cast<std::size_t>(i)];
         if (!token.empty() && token.front() != '-') {
             if (invocation.option_index < 0) {
                 invocation.option_index = i;
@@ -346,25 +337,32 @@ void SchedulePositionals(const PrimaryParserData& data,
     }
 }
 
-void CompactArgv(int& argc,
-                 char** argv,
-                 const std::vector<bool>& consumed) {
-    if (argc <= 0 || argv == nullptr) {
-        return;
+std::vector<std::string> BuildParseTokens(int argc,
+                                          char* const* argv) {
+    std::vector<std::string> tokens(static_cast<std::size_t>(argc));
+    for (int i = 0; i < argc; ++i) {
+        if (argv[i] == nullptr) {
+            continue;
+        }
+        tokens[static_cast<std::size_t>(i)] =
+            kcli::detail::TrimWhitespace(std::string_view(argv[i]));
     }
+    return tokens;
+}
 
-    int write_index = 1;
-    for (int read_index = 1; read_index < argc; ++read_index) {
-        if (!consumed[static_cast<std::size_t>(read_index)]) {
-            argv[write_index++] = argv[read_index];
+void ApplyAliases(const PrimaryParserData& data,
+                  std::vector<std::string>& tokens,
+                  std::vector<bool>& from_alias) {
+    for (const kcli::detail::AliasBinding& alias : data.aliases) {
+        for (int i = 1; i < static_cast<int>(tokens.size()); ++i) {
+            if (tokens[static_cast<std::size_t>(i)] != alias.alias) {
+                continue;
+            }
+
+            tokens[static_cast<std::size_t>(i)] = alias.target;
+            from_alias[static_cast<std::size_t>(i)] = true;
         }
     }
-
-    if (write_index < argc) {
-        argv[write_index] = nullptr;
-    }
-
-    argc = write_index;
 }
 
 void ExecuteInvocations(const std::vector<Invocation>& invocations,
@@ -419,7 +417,7 @@ void ExecuteInvocations(const std::vector<Invocation>& invocations,
 
 namespace kcli::detail {
 
-void Parse(PrimaryParserData& data, int& argc, char** argv) {
+void Parse(PrimaryParserData& data, int argc, char* const* argv) {
     ParseOutcome result{};
     if (argc > 0 && argv == nullptr) {
         result = MakeError("", "kcli received invalid argv (argc > 0 but argv is null)");
@@ -433,30 +431,16 @@ void Parse(PrimaryParserData& data, int& argc, char** argv) {
     std::vector<bool> consumed(static_cast<std::size_t>(argc), false);
     std::vector<bool> from_alias(static_cast<std::size_t>(argc), false);
     std::vector<Invocation> invocations;
+    std::vector<std::string> tokens = BuildParseTokens(argc, argv);
 
-    for (const AliasBinding& alias : data.aliases) {
-        for (int i = 1; i < argc; ++i) {
-            if (argv[i] == nullptr) {
-                continue;
-            }
-
-            const std::string_view token(argv[i]);
-            if (token != alias.alias) {
-                continue;
-            }
-
-            data.owned_tokens.push_back(alias.target);
-            argv[i] = data.owned_tokens.back().data();
-            from_alias[static_cast<std::size_t>(i)] = true;
-        }
-    }
+    ApplyAliases(data, tokens, from_alias);
 
     for (int i = 1; i < argc; ++i) {
-        if (argv[i] == nullptr || consumed[static_cast<std::size_t>(i)]) {
+        if (consumed[static_cast<std::size_t>(i)]) {
             continue;
         }
 
-        const std::string arg = TrimWhitespace(std::string_view(argv[i]));
+        const std::string& arg = tokens[static_cast<std::size_t>(i)];
         if (arg.empty()) {
             continue;
         }
@@ -475,7 +459,7 @@ void Parse(PrimaryParserData& data, int& argc, char** argv) {
             case InlineTokenMatch::Kind::BareRoot: {
                 ConsumeIndex(consumed, i);
                 const CollectedValues collected =
-                    CollectValueTokens(i, argc, argv, consumed, false);
+                    CollectValueTokens(i, tokens, consumed, false);
 
                 if (!collected.has_value) {
                     Invocation help{};
@@ -518,8 +502,7 @@ void Parse(PrimaryParserData& data, int& argc, char** argv) {
                                          arg,
                                          from_alias[static_cast<std::size_t>(i)],
                                          i,
-                                         argc,
-                                         argv,
+                                         tokens,
                                          consumed,
                                          invocations,
                                          result);
@@ -535,8 +518,7 @@ void Parse(PrimaryParserData& data, int& argc, char** argv) {
                                              arg,
                                              from_alias[static_cast<std::size_t>(i)],
                                              i,
-                                             argc,
-                                             argv,
+                                             tokens,
                                              consumed,
                                              invocations,
                                              result);
@@ -552,18 +534,16 @@ void Parse(PrimaryParserData& data, int& argc, char** argv) {
     }
 
     if (result.ok) {
-        SchedulePositionals(data, argc, argv, consumed, invocations);
+        SchedulePositionals(data, tokens, consumed, invocations);
     }
-
-    CompactArgv(argc, argv, consumed);
 
     if (result.ok) {
         for (int i = 1; i < argc; ++i) {
-            if (argv[i] == nullptr) {
+            if (consumed[static_cast<std::size_t>(i)]) {
                 continue;
             }
 
-            const std::string token = TrimWhitespace(std::string_view(argv[i]));
+            const std::string& token = tokens[static_cast<std::size_t>(i)];
             if (token.empty()) {
                 continue;
             }

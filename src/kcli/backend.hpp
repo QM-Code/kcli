@@ -2,7 +2,6 @@
 
 #include <kcli.hpp>
 
-#include <deque>
 #include <string>
 #include <vector>
 
@@ -31,7 +30,6 @@ struct InlineParserData {
 
 struct PrimaryParserData {
     PositionalHandler positional_handler{};
-    std::deque<std::string> owned_tokens{};
     std::vector<AliasBinding> aliases{};
     std::vector<std::pair<std::string, CommandBinding>> commands{};
     std::vector<InlineParserData> inline_parsers{};
@@ -67,6 +65,6 @@ void SetPrimaryHandler(PrimaryParserData& data,
                        ValueMode mode);
 void SetPositionalHandler(PrimaryParserData& data, PositionalHandler handler);
 void AddInlineParser(PrimaryParserData& data, InlineParserData parser);
-void Parse(PrimaryParserData& data, int& argc, char** argv);
+void Parse(PrimaryParserData& data, int argc, char* const* argv);
 
 }  // namespace kcli::detail
