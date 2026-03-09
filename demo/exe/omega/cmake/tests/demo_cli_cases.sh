@@ -8,9 +8,18 @@ usage() {
     echo "  unknown_beta_option"
     echo "  unknown_renamed_option"
     echo "  known_alpha_option"
+    echo "  alpha_multi_value"
+    echo "  beta_workers_option"
+    echo "  renamed_tag_option"
+    echo "  alpha_help_root"
+    echo "  renamed_help_root"
     echo "  unknown_app_option"
     echo "  known_and_unknown_option"
     echo "  alpha_alias_option"
+    echo "  output_option"
+    echo "  output_alias_option"
+    echo "  build_profile_option"
+    echo "  build_alias_option"
     echo "  positional_args"
     echo "  double_dash_not_separator"
 }
@@ -31,7 +40,7 @@ fi
 require_contains() {
     local output="$1"
     local needle="$2"
-    if ! grep -Fq "$needle" <<<"$output"; then
+    if ! grep -Fq -- "$needle" <<<"$output"; then
         echo "Expected output to contain: $needle" >&2
         echo "--- output begin ---" >&2
         echo "$output" >&2
@@ -43,7 +52,7 @@ require_contains() {
 require_not_contains() {
     local output="$1"
     local needle="$2"
-    if grep -Fq "$needle" <<<"$output"; then
+    if grep -Fq -- "$needle" <<<"$output"; then
         echo "Expected output to not contain: $needle" >&2
         echo "--- output begin ---" >&2
         echo "$output" >&2
@@ -109,6 +118,68 @@ case "$test_case" in
         require_contains "$output" "Processing --alpha-message with value \"hello\""
         require_not_contains "$output" "CLI error:"
         ;;
+    alpha_multi_value)
+        run_and_split --alpha-message hello world
+        if [[ "$status" -ne 0 ]]; then
+            echo "Expected zero exit status for multi-value alpha option" >&2
+            echo "--- output begin ---" >&2
+            echo "$output" >&2
+            echo "--- output end ---" >&2
+            exit 1
+        fi
+        require_contains "$output" "Processing --alpha-message with values [\"hello\",\"world\"]"
+        require_not_contains "$output" "CLI error:"
+        ;;
+    beta_workers_option)
+        run_and_split --beta-workers 8
+        if [[ "$status" -ne 0 ]]; then
+            echo "Expected zero exit status for beta workers option" >&2
+            echo "--- output begin ---" >&2
+            echo "$output" >&2
+            echo "--- output end ---" >&2
+            exit 1
+        fi
+        require_contains "$output" "Processing --beta-workers with value \"8\""
+        require_not_contains "$output" "CLI error:"
+        ;;
+    renamed_tag_option)
+        run_and_split --renamed-tag prod
+        if [[ "$status" -ne 0 ]]; then
+            echo "Expected zero exit status for renamed tag option" >&2
+            echo "--- output begin ---" >&2
+            echo "$output" >&2
+            echo "--- output end ---" >&2
+            exit 1
+        fi
+        require_contains "$output" "Processing --renamed-tag with value \"prod\""
+        require_not_contains "$output" "CLI error:"
+        ;;
+    alpha_help_root)
+        run_and_split --alpha
+        if [[ "$status" -ne 0 ]]; then
+            echo "Expected zero exit status for alpha help root" >&2
+            echo "--- output begin ---" >&2
+            echo "$output" >&2
+            echo "--- output end ---" >&2
+            exit 1
+        fi
+        require_contains "$output" "Available --alpha-* options:"
+        require_contains "$output" "--alpha-enable [value]"
+        require_not_contains "$output" "CLI error:"
+        ;;
+    renamed_help_root)
+        run_and_split --renamed
+        if [[ "$status" -ne 0 ]]; then
+            echo "Expected zero exit status for renamed help root" >&2
+            echo "--- output begin ---" >&2
+            echo "$output" >&2
+            echo "--- output end ---" >&2
+            exit 1
+        fi
+        require_contains "$output" "Available --renamed-* options:"
+        require_contains "$output" "--renamed-tag <value>"
+        require_not_contains "$output" "CLI error:"
+        ;;
     unknown_app_option)
         run_and_split --bogus
         if [[ "$status" -eq 0 ]]; then
@@ -136,6 +207,54 @@ case "$test_case" in
             exit 1
         fi
         require_contains "$output" "Processing --alpha-enable"
+        require_not_contains "$output" "CLI error:"
+        ;;
+    output_option)
+        run_and_split --output stdout
+        if [[ "$status" -ne 0 ]]; then
+            echo "Expected zero exit status for output option" >&2
+            echo "--- output begin ---" >&2
+            echo "$output" >&2
+            echo "--- output end ---" >&2
+            exit 1
+        fi
+        require_contains "$output" "Enabled --<root> prefixes:"
+        require_not_contains "$output" "CLI error:"
+        ;;
+    output_alias_option)
+        run_and_split -out stdout
+        if [[ "$status" -ne 0 ]]; then
+            echo "Expected zero exit status for output alias option" >&2
+            echo "--- output begin ---" >&2
+            echo "$output" >&2
+            echo "--- output end ---" >&2
+            exit 1
+        fi
+        require_contains "$output" "Enabled --<root> prefixes:"
+        require_not_contains "$output" "CLI error:"
+        ;;
+    build_profile_option)
+        run_and_split --build-profile debug
+        if [[ "$status" -ne 0 ]]; then
+            echo "Expected zero exit status for build profile option" >&2
+            echo "--- output begin ---" >&2
+            echo "$output" >&2
+            echo "--- output end ---" >&2
+            exit 1
+        fi
+        require_contains "$output" "Enabled --<root> prefixes:"
+        require_not_contains "$output" "CLI error:"
+        ;;
+    build_alias_option)
+        run_and_split -b debug
+        if [[ "$status" -ne 0 ]]; then
+            echo "Expected zero exit status for build alias option" >&2
+            echo "--- output begin ---" >&2
+            echo "$output" >&2
+            echo "--- output end ---" >&2
+            exit 1
+        fi
+        require_contains "$output" "Enabled --<root> prefixes:"
         require_not_contains "$output" "CLI error:"
         ;;
     positional_args)

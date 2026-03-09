@@ -1,3 +1,55 @@
-# Placeholder for root-level CTest definitions.
-#
-# Add tests with add_test(...) when needed.
+add_executable(kcli_api_cases
+    ${CMAKE_CURRENT_LIST_DIR}/kcli_api_cases.cpp
+)
+
+target_link_libraries(kcli_api_cases
+    PRIVATE
+        kcli::sdk
+)
+
+ktools_apply_runtime_rpath(kcli_api_cases)
+
+function(kcli_add_api_case case_name)
+    add_test(
+        NAME kcli_api_${case_name}
+        COMMAND $<TARGET_FILE:kcli_api_cases> ${case_name}
+    )
+endfunction()
+
+kcli_add_api_case(process_requires_initialize)
+kcli_add_api_case(initialize_rejects_invalid_root)
+kcli_add_api_case(end_user_known_options_and_argc_compaction)
+kcli_add_api_case(initialize_clears_positional_handler_between_phases)
+kcli_add_api_case(expand_alias_rewrites_tokens)
+kcli_add_api_case(expand_alias_rewrites_after_double_dash)
+kcli_add_api_case(expand_alias_rejects_invalid_alias)
+kcli_add_api_case(expand_alias_rejects_invalid_target)
+kcli_add_api_case(expand_alias_not_allowed_inline)
+kcli_add_api_case(set_root_value_handler_requires_inline_and_nonempty)
+kcli_add_api_case(set_positional_handler_requires_end_user_and_nonempty)
+kcli_add_api_case(end_user_handler_normalization_rejects_single_dash)
+kcli_add_api_case(inline_handler_normalization_accepts_short_and_full_forms)
+kcli_add_api_case(inline_handler_normalization_rejects_wrong_root)
+kcli_add_api_case(inline_bare_root_prints_help)
+kcli_add_api_case(inline_root_value_handler_joins_tokens)
+kcli_add_api_case(inline_missing_root_value_handler_errors)
+kcli_add_api_case(optional_value_mode_allows_missing_value)
+kcli_add_api_case(value_mode_none_does_not_consume_following_tokens)
+kcli_add_api_case(required_value_mode_rejects_missing_value)
+kcli_add_api_case(reject_dash_prefixed_values_rejects_first_value)
+kcli_add_api_case(reject_dash_prefixed_values_false_accepts_first_value)
+kcli_add_api_case(unknown_dash_option_policy_ignore_preserves_token)
+kcli_add_api_case(unknown_dash_option_policy_consume_removes_token)
+kcli_add_api_case(unknown_dash_option_policy_error_reports_help_hint)
+kcli_add_api_case(prefix_root_match_ignore_preserves_token)
+kcli_add_api_case(prefix_root_match_consume_removes_token)
+kcli_add_api_case(prefix_root_match_error_reports_token)
+kcli_add_api_case(fail_on_unknown_return_mode_reports_double_dash)
+kcli_add_api_case(fail_on_unknown_throw_mode_throws)
+kcli_add_api_case(inline_process_throw_mode_throws)
+kcli_add_api_case(option_handler_exception_return_mode)
+kcli_add_api_case(option_handler_exception_throw_mode)
+kcli_add_api_case(positional_handler_exception_return_mode)
+kcli_add_api_case(positional_handler_exception_throw_mode)
+kcli_add_api_case(multi_phase_processing_consumes_inline_end_user_and_positionals)
+kcli_add_api_case(clear_positional_handler_stops_consuming_positionals)
