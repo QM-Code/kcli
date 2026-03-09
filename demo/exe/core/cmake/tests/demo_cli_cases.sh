@@ -7,6 +7,9 @@ usage() {
     echo "  unknown_alpha_option"
     echo "  known_alpha_option"
     echo "  alpha_multi_value"
+    echo "  alpha_required_whitespace_value"
+    echo "  alpha_optional_explicit_empty_value"
+    echo "  alpha_required_alias_like_value"
     echo "  alpha_optional_no_value"
     echo "  alpha_alias_option"
     echo "  alpha_help_root"
@@ -105,6 +108,43 @@ case "$test_case" in
             exit 1
         fi
         require_contains "$output" "Processing --alpha-message with values [\"hello\",\"world\"]"
+        require_not_contains "$output" "CLI error:"
+        ;;
+    alpha_required_whitespace_value)
+        run_and_split --alpha-message " Joe "
+        if [[ "$status" -ne 0 ]]; then
+            echo "Expected zero exit status for whitespace-preserved alpha value" >&2
+            echo "--- output begin ---" >&2
+            echo "$output" >&2
+            echo "--- output end ---" >&2
+            exit 1
+        fi
+        require_contains "$output" "Processing --alpha-message with value \" Joe \""
+        require_not_contains "$output" "CLI error:"
+        ;;
+    alpha_optional_explicit_empty_value)
+        run_and_split --alpha-enable ""
+        if [[ "$status" -ne 0 ]]; then
+            echo "Expected zero exit status for explicit empty optional alpha value" >&2
+            echo "--- output begin ---" >&2
+            echo "$output" >&2
+            echo "--- output end ---" >&2
+            exit 1
+        fi
+        require_contains "$output" "Processing --alpha-enable with value \"\""
+        require_not_contains "$output" "CLI error:"
+        ;;
+    alpha_required_alias_like_value)
+        run_and_split --alpha-message -a
+        if [[ "$status" -ne 0 ]]; then
+            echo "Expected zero exit status for alias-like alpha payload value" >&2
+            echo "--- output begin ---" >&2
+            echo "$output" >&2
+            echo "--- output end ---" >&2
+            exit 1
+        fi
+        require_contains "$output" "Processing --alpha-message with value \"-a\""
+        require_not_contains "$output" "Processing --alpha-enable"
         require_not_contains "$output" "CLI error:"
         ;;
     alpha_optional_no_value)

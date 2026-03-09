@@ -19,6 +19,9 @@ struct HandlerContext {
     std::string_view root{};
     std::string_view option{};
     std::string_view command{};
+    // Raw shell tokens consumed for this handler, preserved verbatim.
+    // For optional-value handlers, an omitted value leaves this empty;
+    // an explicit empty-string argument contributes one empty token.
     std::vector<std::string_view> value_tokens{};
     bool from_alias = false;
     int option_index = -1;

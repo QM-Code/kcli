@@ -24,6 +24,27 @@ add_test(
 )
 
 add_test(
+    NAME demo_cli_alpha_required_whitespace_value_ok
+    COMMAND ${KCLI_DEMO_CLI_CASES_SCRIPT}
+            $<TARGET_FILE:kcli_demo_core>
+            alpha_required_whitespace_value
+)
+
+add_test(
+    NAME demo_cli_alpha_optional_explicit_empty_value_ok
+    COMMAND ${KCLI_DEMO_CLI_CASES_SCRIPT}
+            $<TARGET_FILE:kcli_demo_core>
+            alpha_optional_explicit_empty_value
+)
+
+add_test(
+    NAME demo_cli_alpha_required_alias_like_value_ok
+    COMMAND ${KCLI_DEMO_CLI_CASES_SCRIPT}
+            $<TARGET_FILE:kcli_demo_core>
+            alpha_required_alias_like_value
+)
+
+add_test(
     NAME demo_cli_alpha_optional_no_value_ok
     COMMAND ${KCLI_DEMO_CLI_CASES_SCRIPT}
             $<TARGET_FILE:kcli_demo_core>

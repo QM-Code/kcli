@@ -72,9 +72,11 @@ Inline mode behavior:
 - Root value handlers can also advertise a help row such as `--build <selector>`.
 - Required option values consume the next CLI token, even when it starts with `-`.
 - Optional values only start consuming when the next token looks like a value.
+- `HandlerContext::value_tokens` preserves raw shell tokens, including surrounding whitespace and explicit empty-string arguments.
+- For optional-value handlers, omitted values yield an empty `value_tokens`; explicit `""` yields one empty token.
 - Unknown option-like tokens fail the parse.
 - Literal `--` is rejected as an unknown option; it is not treated as an option terminator.
-- Aliases are defined on the primary parser and expanded before dispatch.
+- Aliases are defined on the primary parser and only expand when a token is parsed as an option; consumed value tokens are not alias-expanded.
 - Handlers run only after the full command line validates.
 - `parse(argc, argv)` reads the caller's argument vector without rewriting or compacting it.
 - `parse()` reports invalid CLI input to `stderr` as `[error] [cli] ...`, colors `error` red and `cli` blue on terminals, and exits with code `2`.

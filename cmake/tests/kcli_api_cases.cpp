@@ -374,6 +374,37 @@ void CasePrimaryParserCanBeReusedAcrossParses(TestContext& t) {
                "the second caller argv should remain unchanged");
 }
 
+void CaseAliasDoesNotRewriteRequiredValueTokens(TestContext& t) {
+    ArgvFixture args{"prog", "--output", "-v"};
+
+    bool verbose = false;
+    std::string output;
+
+    kcli::PrimaryParser parser;
+    parser.addAlias("-v", "--verbose");
+    parser.setHandler("--verbose",
+                      [&](const kcli::HandlerContext&) {
+                          verbose = true;
+                      },
+                      "Enable verbose logging.");
+    parser.setHandler("--output",
+                      [&](const kcli::HandlerContext& context, std::string_view value) {
+                          output = std::string(value);
+                          t.Expect(!context.from_alias,
+                                   "required value handlers should not report alias expansion for payload tokens");
+                      },
+                      "Set output target.",
+                      kcli::ValueMode::Required);
+
+    parser.parse(args.argc, args.data());
+
+    t.Expect(!verbose, "alias targets consumed as required values should not dispatch alias handlers");
+    t.ExpectEq(output, std::string("-v"), "required value handlers should receive the raw alias-like token");
+    t.ExpectEq(args.CurrentTokens(),
+               std::vector<std::string>{"prog", "--output", "-v"},
+               "parse() should leave argv unchanged when required values look like aliases");
+}
+
 void CaseAddAliasRejectsInvalidAlias(TestContext& t) {
     kcli::PrimaryParser parser;
 
@@ -622,6 +653,39 @@ void CaseOptionalValueModeAllowsMissingValue(TestContext& t) {
                "parse() should leave argv unchanged for optional values");
 }
 
+void CaseOptionalValueModeAcceptsExplicitEmptyValue(TestContext& t) {
+    ArgvFixture args{"prog", "--build-enable", ""};
+
+    bool called = false;
+    std::string received_value;
+    std::vector<std::string> received_tokens;
+
+    kcli::PrimaryParser parser;
+    AddInlineParser(
+        parser,
+        "build",
+        [&](kcli::InlineParser& inline_parser) {
+            inline_parser.setHandler("-enable",
+                                     [&](const kcli::HandlerContext& context, std::string_view value) {
+                                         called = true;
+                                         received_value = std::string(value);
+                                         received_tokens = CopyTokens(context.value_tokens);
+                                     },
+                                     "Enable build mode.",
+                                     kcli::ValueMode::Optional);
+        });
+
+    parser.parse(args.argc, args.data());
+    t.Expect(called, "optional value handler should still run for an explicit empty token");
+    t.ExpectEq(received_value, std::string(), "explicit empty optional values should remain empty");
+    t.ExpectEq(received_tokens,
+               std::vector<std::string>{""},
+               "optional value handlers should receive the explicit empty token");
+    t.ExpectEq(args.CurrentTokens(),
+               std::vector<std::string>{"prog", "--build-enable", ""},
+               "parse() should leave argv unchanged for explicit empty optional values");
+}
+
 void CaseValueModeNoneDoesNotConsumeFollowingTokens(TestContext& t) {
     ArgvFixture args{"prog", "--build-meta", "data"};
 
@@ -707,6 +771,86 @@ void CaseRequiredValueModeAcceptsDashPrefixedFirstValue(TestContext& t) {
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--build-value", "-debug"},
                "parse() should leave argv unchanged when consuming dash-prefixed values");
+}
+
+void CaseRequiredValueModePreservesShellWhitespace(TestContext& t) {
+    ArgvFixture args{"prog", "--name", " Joe "};
+
+    std::string received_value;
+    std::vector<std::string> received_tokens;
+
+    kcli::PrimaryParser parser;
+    parser.setHandler("--name",
+                      [&](const kcli::HandlerContext& context, std::string_view value) {
+                          received_value = std::string(value);
+                          received_tokens = CopyTokens(context.value_tokens);
+                      },
+                      "Set the display name.",
+                      kcli::ValueMode::Required);
+
+    parser.parse(args.argc, args.data());
+
+    t.ExpectEq(received_value,
+               std::string(" Joe "),
+               "required value handlers should receive shell-preserved whitespace");
+    t.ExpectEq(received_tokens,
+               std::vector<std::string>{" Joe "},
+               "context value tokens should preserve shell-provided whitespace");
+    t.ExpectEq(args.CurrentTokens(),
+               std::vector<std::string>{"prog", "--name", " Joe "},
+               "parse() should leave argv unchanged when values contain surrounding whitespace");
+}
+
+void CaseRequiredValueModeAcceptsExplicitEmptyValue(TestContext& t) {
+    ArgvFixture args{"prog", "--name", ""};
+
+    std::string received_value;
+    std::vector<std::string> received_tokens;
+
+    kcli::PrimaryParser parser;
+    parser.setHandler("--name",
+                      [&](const kcli::HandlerContext& context, std::string_view value) {
+                          received_value = std::string(value);
+                          received_tokens = CopyTokens(context.value_tokens);
+                      },
+                      "Set the display name.",
+                      kcli::ValueMode::Required);
+
+    parser.parse(args.argc, args.data());
+
+    t.ExpectEq(received_value,
+               std::string(),
+               "required value handlers should accept an explicit empty string");
+    t.ExpectEq(received_tokens,
+               std::vector<std::string>{""},
+               "context value tokens should preserve explicit empty required values");
+    t.ExpectEq(args.CurrentTokens(),
+               std::vector<std::string>{"prog", "--name", ""},
+               "parse() should leave argv unchanged for explicit empty required values");
+}
+
+void CasePositionalHandlerPreservesExplicitEmptyTokens(TestContext& t) {
+    ArgvFixture args{"prog", "", "tail"};
+
+    std::vector<std::string> positionals;
+    int option_index = -1;
+
+    kcli::PrimaryParser parser;
+    parser.setPositionalHandler(
+        [&](const kcli::HandlerContext& context) {
+            positionals = CopyTokens(context.value_tokens);
+            option_index = context.option_index;
+        });
+
+    parser.parse(args.argc, args.data());
+
+    t.ExpectEq(positionals,
+               std::vector<std::string>{"", "tail"},
+               "positional handlers should receive explicit empty shell tokens");
+    t.ExpectEq(option_index, 1, "the first explicit empty positional should set option_index");
+    t.ExpectEq(args.CurrentTokens(),
+               std::vector<std::string>{"prog", "", "tail"},
+               "parse() should leave argv unchanged for explicit empty positional values");
 }
 
 void CaseUnknownInlineOptionErrors(TestContext& t) {
@@ -892,6 +1036,7 @@ const std::pair<std::string_view, CaseFunction> kCases[] = {
     {"add_alias_rewrites_tokens", CaseAddAliasRewritesTokens},
     {"add_alias_rewrites_after_double_dash", CaseAddAliasRewritesAfterDoubleDash},
     {"primary_parser_can_be_reused_across_parses", CasePrimaryParserCanBeReusedAcrossParses},
+    {"alias_does_not_rewrite_required_value_tokens", CaseAliasDoesNotRewriteRequiredValueTokens},
     {"add_alias_rejects_invalid_alias", CaseAddAliasRejectsInvalidAlias},
     {"add_alias_rejects_invalid_target", CaseAddAliasRejectsInvalidTarget},
     {"positional_handler_requires_nonempty", CasePositionalHandlerRequiresNonEmpty},
@@ -906,11 +1051,19 @@ const std::pair<std::string_view, CaseFunction> kCases[] = {
     {"inline_root_value_handler_joins_tokens", CaseInlineRootValueHandlerJoinsTokens},
     {"inline_missing_root_value_handler_errors", CaseInlineMissingRootValueHandlerErrors},
     {"optional_value_mode_allows_missing_value", CaseOptionalValueModeAllowsMissingValue},
+    {"optional_value_mode_accepts_explicit_empty_value",
+     CaseOptionalValueModeAcceptsExplicitEmptyValue},
     {"value_mode_none_does_not_consume_following_tokens",
      CaseValueModeNoneDoesNotConsumeFollowingTokens},
     {"required_value_mode_rejects_missing_value", CaseRequiredValueModeRejectsMissingValue},
     {"required_value_mode_accepts_dash_prefixed_first_value",
      CaseRequiredValueModeAcceptsDashPrefixedFirstValue},
+    {"required_value_mode_preserves_shell_whitespace",
+     CaseRequiredValueModePreservesShellWhitespace},
+    {"required_value_mode_accepts_explicit_empty_value",
+     CaseRequiredValueModeAcceptsExplicitEmptyValue},
+    {"positional_handler_preserves_explicit_empty_tokens",
+     CasePositionalHandlerPreservesExplicitEmptyTokens},
     {"unknown_inline_option_errors", CaseUnknownInlineOptionErrors},
     {"unknown_option_reports_double_dash", CaseUnknownOptionReportsDoubleDash},
     {"unknown_option_throws_cli_error", CaseUnknownOptionThrowsCliError},

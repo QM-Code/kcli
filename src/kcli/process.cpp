@@ -57,10 +57,7 @@ struct InlineTokenMatch {
 };
 
 bool IsCollectableFollowOnValueToken(std::string_view value) {
-    if (value.empty()) {
-        return false;
-    }
-    if (value.front() == '-') {
+    if (!value.empty() && value.front() == '-') {
         return false;
     }
     return true;
@@ -123,10 +120,7 @@ CollectedValues CollectValueTokens(int option_index,
     }
 
     const std::string& first = tokens[static_cast<std::size_t>(first_value_index)];
-    if (first.empty()) {
-        return collected;
-    }
-    if (!allow_option_like_first_value && first.front() == '-') {
+    if (!allow_option_like_first_value && !first.empty() && first.front() == '-') {
         return collected;
     }
 
@@ -135,7 +129,7 @@ CollectedValues CollectValueTokens(int option_index,
     consumed[static_cast<std::size_t>(first_value_index)] = true;
     collected.last_index = first_value_index;
 
-    if (allow_option_like_first_value && first.front() == '-') {
+    if (allow_option_like_first_value && !first.empty() && first.front() == '-') {
         return collected;
     }
 
@@ -199,6 +193,19 @@ const CommandBinding* FindCommand(const std::vector<std::pair<std::string, Comma
         }
     }
     return nullptr;
+}
+
+bool ApplyAliasesToOptionToken(const PrimaryParserData& data, std::string& token) {
+    bool expanded = false;
+    for (const kcli::detail::AliasBinding& alias : data.aliases) {
+        if (token != alias.alias) {
+            continue;
+        }
+
+        token = alias.target;
+        expanded = true;
+    }
+    return expanded;
 }
 
 std::vector<std::pair<std::string, std::string>> BuildHelpRows(const InlineParserData& parser) {
@@ -323,7 +330,7 @@ void SchedulePositionals(const PrimaryParserData& data,
         }
 
         const std::string& token = tokens[static_cast<std::size_t>(i)];
-        if (!token.empty() && token.front() != '-') {
+        if (token.empty() || token.front() != '-') {
             if (invocation.option_index < 0) {
                 invocation.option_index = i;
             }
@@ -344,25 +351,9 @@ std::vector<std::string> BuildParseTokens(int argc,
         if (argv[i] == nullptr) {
             continue;
         }
-        tokens[static_cast<std::size_t>(i)] =
-            kcli::detail::TrimWhitespace(std::string_view(argv[i]));
+        tokens[static_cast<std::size_t>(i)] = std::string(argv[i]);
     }
     return tokens;
-}
-
-void ApplyAliases(const PrimaryParserData& data,
-                  std::vector<std::string>& tokens,
-                  std::vector<bool>& from_alias) {
-    for (const kcli::detail::AliasBinding& alias : data.aliases) {
-        for (int i = 1; i < static_cast<int>(tokens.size()); ++i) {
-            if (tokens[static_cast<std::size_t>(i)] != alias.alias) {
-                continue;
-            }
-
-            tokens[static_cast<std::size_t>(i)] = alias.target;
-            from_alias[static_cast<std::size_t>(i)] = true;
-        }
-    }
 }
 
 void ExecuteInvocations(const std::vector<Invocation>& invocations,
@@ -433,16 +424,20 @@ void Parse(PrimaryParserData& data, int argc, char* const* argv) {
     std::vector<Invocation> invocations;
     std::vector<std::string> tokens = BuildParseTokens(argc, argv);
 
-    ApplyAliases(data, tokens, from_alias);
-
     for (int i = 1; i < argc; ++i) {
         if (consumed[static_cast<std::size_t>(i)]) {
             continue;
         }
 
-        const std::string& arg = tokens[static_cast<std::size_t>(i)];
+        std::string& arg = tokens[static_cast<std::size_t>(i)];
         if (arg.empty()) {
             continue;
+        }
+
+        if (arg.front() == '-' &&
+            !StartsWith(arg, "--") &&
+            ApplyAliasesToOptionToken(data, arg)) {
+            from_alias[static_cast<std::size_t>(i)] = true;
         }
 
         if (arg.front() != '-') {
