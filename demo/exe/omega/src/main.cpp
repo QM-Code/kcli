@@ -77,8 +77,7 @@ int main(int argc, char** argv) {
         return 2;
     }
 
-    std::cout << "\nKCLI demo omega compile/link/integration check passed\n\n";
-    std::cout << "Usage:\n";
+    std::cout << "\nUsage:\n";
     std::cout << "  kcli_demo_omega --<root>\n\n";
     std::cout << "Enabled --<root> prefixes:\n";
     std::cout << "  --alpha\n";

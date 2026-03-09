@@ -57,3 +57,10 @@ add_test(
             $<TARGET_FILE:kcli_demo_omega>
             positional_args
 )
+
+add_test(
+    NAME demo_cli_double_dash_not_separator_errors
+    COMMAND ${KCLI_DEMO_CLI_CASES_SCRIPT}
+            $<TARGET_FILE:kcli_demo_omega>
+            double_dash_not_separator
+)

@@ -7,6 +7,7 @@ usage() {
     echo "  unknown_alpha_option"
     echo "  known_alpha_option"
     echo "  output_option"
+    echo "  double_dash_not_separator"
 }
 
 if [[ $# -ne 2 ]]; then
@@ -99,6 +100,16 @@ case "$test_case" in
         fi
         require_contains "$output" "KCLI demo core compile/link/integration check passed"
         require_not_contains "$output" "CLI error:"
+        ;;
+    double_dash_not_separator)
+        run_and_split -- --alpha-message hello
+        if [[ "$status" -eq 0 ]]; then
+            echo "Expected non-zero exit status when passing '--'" >&2
+            exit 1
+        fi
+        require_contains "$output" "Processing --alpha-message with value \"hello\""
+        require_contains "$output" "CLI error: unknown option --"
+        require_not_contains "$output" "KCLI demo core compile/link/integration check passed"
         ;;
     *)
         echo "Error: unknown case '$test_case'" >&2

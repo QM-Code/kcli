@@ -155,7 +155,6 @@ void ConsumePositionals(SessionState& state, ProcessResult& result) {
     std::vector<bool> consumed(static_cast<std::size_t>(argc), false);
     std::vector<std::string_view> positional_tokens;
     positional_tokens.reserve(static_cast<std::size_t>(argc));
-    bool after_separator = false;
     int first_index = -1;
 
     for (int i = 1; i < argc; ++i) {
@@ -164,13 +163,7 @@ void ConsumePositionals(SessionState& state, ProcessResult& result) {
         }
 
         const std::string_view token(state.parse.argv[i]);
-        if (!after_separator && token == "--") {
-            consumed[static_cast<std::size_t>(i)] = true;
-            after_separator = true;
-            continue;
-        }
-
-        if (after_separator || (!token.empty() && token.front() != '-')) {
+        if (!token.empty() && token.front() != '-') {
             consumed[static_cast<std::size_t>(i)] = true;
             positional_tokens.push_back(token);
             if (first_index < 0) {
@@ -245,10 +238,6 @@ bool ExpandAlias(std::string_view alias, std::string_view target) {
         }
 
         const std::string_view token(state.parse.argv[i]);
-        if (token == "--") {
-            break;
-        }
-
         if (token == alias_token) {
             state.owned_tokens.push_back(target_token);
             state.parse.argv[i] = const_cast<char*>(state.owned_tokens.back().c_str());
@@ -341,9 +330,6 @@ ProcessResult FailOnUnknown() {
         const std::string token = detail::TrimWhitespace(std::string_view(state.parse.argv[i]));
         if (token.empty()) {
             continue;
-        }
-        if (token == "--") {
-            break;
         }
         if (token.front() == '-') {
             result = MakeError(token, "unknown option " + token);
