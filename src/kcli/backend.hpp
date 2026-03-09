@@ -24,6 +24,8 @@ struct AliasBinding {
 struct InlineParserData {
     std::string root_name{};
     ValueHandler root_value_handler{};
+    std::string root_value_placeholder{};
+    std::string root_value_description{};
     std::vector<std::pair<std::string, CommandBinding>> commands{};
 };
 
@@ -39,6 +41,10 @@ InlineParserData CloneInlineParserData(const InlineParserData& data);
 
 void SetInlineRoot(InlineParserData& data, std::string_view root);
 void SetRootValueHandler(InlineParserData& data, ValueHandler handler);
+void SetRootValueHandler(InlineParserData& data,
+                         ValueHandler handler,
+                         std::string_view value_placeholder,
+                         std::string_view description);
 void SetInlineHandler(InlineParserData& data,
                       std::string_view option,
                       FlagHandler handler,

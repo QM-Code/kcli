@@ -71,6 +71,20 @@ void SetRootValueHandler(InlineParserData& data, ValueHandler handler) {
         throw std::invalid_argument("kcli root value handler must not be empty");
     }
     data.root_value_handler = std::move(handler);
+    data.root_value_placeholder.clear();
+    data.root_value_description.clear();
+}
+
+void SetRootValueHandler(InlineParserData& data,
+                         ValueHandler handler,
+                         std::string_view value_placeholder,
+                         std::string_view description) {
+    if (!handler) {
+        throw std::invalid_argument("kcli root value handler must not be empty");
+    }
+    data.root_value_handler = std::move(handler);
+    data.root_value_placeholder = NormalizeHelpPlaceholderOrThrow(value_placeholder);
+    data.root_value_description = NormalizeDescriptionOrThrow(description);
 }
 
 void SetInlineHandler(InlineParserData& data,

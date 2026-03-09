@@ -132,6 +132,14 @@ std::string NormalizeAliasTargetOrThrow(std::string_view raw_target) {
     return target;
 }
 
+std::string NormalizeHelpPlaceholderOrThrow(std::string_view raw_placeholder) {
+    std::string placeholder = TrimWhitespace(raw_placeholder);
+    if (placeholder.empty()) {
+        throw std::invalid_argument("kcli help placeholder must not be empty");
+    }
+    return placeholder;
+}
+
 std::string NormalizeDescriptionOrThrow(std::string_view raw_description) {
     std::string description = TrimWhitespace(raw_description);
     if (description.empty()) {

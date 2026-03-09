@@ -210,7 +210,17 @@ const CommandBinding* FindCommand(const std::vector<std::pair<std::string, Comma
 std::vector<std::pair<std::string, std::string>> BuildHelpRows(const InlineParserData& parser) {
     const std::string prefix = "--" + parser.root_name + "-";
     std::vector<std::pair<std::string, std::string>> rows;
-    rows.reserve(parser.commands.size());
+    rows.reserve(parser.commands.size() +
+                 ((parser.root_value_handler && !parser.root_value_description.empty()) ? 1u : 0u));
+
+    if (parser.root_value_handler && !parser.root_value_description.empty()) {
+        std::string lhs = "--" + parser.root_name;
+        if (!parser.root_value_placeholder.empty()) {
+            lhs.push_back(' ');
+            lhs.append(parser.root_value_placeholder);
+        }
+        rows.emplace_back(std::move(lhs), parser.root_value_description);
+    }
 
     for (const auto& [command, binding] : parser.commands) {
         std::string lhs = prefix + command;

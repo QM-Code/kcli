@@ -50,6 +50,13 @@ void InlineParser::setRootValueHandler(ValueHandler handler) {
     detail::SetRootValueHandler(*data_, std::move(handler));
 }
 
+void InlineParser::setRootValueHandler(ValueHandler handler,
+                                       std::string_view value_placeholder,
+                                       std::string_view description) {
+    detail::SetRootValueHandler(
+        *data_, std::move(handler), value_placeholder, description);
+}
+
 void InlineParser::setHandler(std::string_view option,
                               FlagHandler handler,
                               std::string_view description) {

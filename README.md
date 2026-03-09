@@ -74,6 +74,7 @@ try {
 Inline mode behavior:
 - `--<root>` always prints available `--<root>-*` options.
 - `--<root> value [value...]` is accepted only when a root value handler is registered.
+- Root value handlers can also advertise a help row such as `--build <selector>`.
 - Required option values consume the next CLI token, even when it starts with `-`.
 - Optional values only start consuming when the next token looks like a value.
 - Unknown option-like tokens fail the parse.

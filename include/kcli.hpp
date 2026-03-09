@@ -58,6 +58,9 @@ public:
     void setRoot(std::string_view root);
 
     void setRootValueHandler(ValueHandler handler);
+    void setRootValueHandler(ValueHandler handler,
+                             std::string_view value_placeholder,
+                             std::string_view description);
 
     void setHandler(std::string_view option,
                     FlagHandler handler,

@@ -471,6 +471,37 @@ void CaseInlineBareRootPrintsHelp(TestContext& t) {
                      "bare inline root help should include registered value options");
 }
 
+void CaseInlineRootValueHandlerHelpRowPrints(TestContext& t) {
+    ArgvFixture args{"prog", "--build"};
+
+    kcli::PrimaryParser parser;
+    AddInlineParser(
+        parser,
+        "build",
+        [&](kcli::InlineParser& inline_parser) {
+            inline_parser.setRootValueHandler(
+                [&](const kcli::HandlerContext&, std::string_view) {
+                },
+                "<selector>",
+                "Select build targets.");
+            inline_parser.setHandler("-flag",
+                                     [&](const kcli::HandlerContext&) {
+                                     },
+                                     "Enable build flag.");
+        });
+
+    CaptureStdout capture;
+    parser.parse(args.argc, args.data());
+    const std::string output = capture.str();
+
+    t.ExpectContains(output,
+                     "--build <selector>",
+                     "bare inline root help should include the root value form");
+    t.ExpectContains(output,
+                     "Select build targets.",
+                     "bare inline root help should include the root value description");
+}
+
 void CaseInlineRootValueHandlerJoinsTokens(TestContext& t) {
     ArgvFixture args{"prog", "--build", "fast", "mode"};
 
@@ -830,6 +861,7 @@ const std::pair<std::string_view, CaseFunction> kCases[] = {
     {"inline_handler_normalization_rejects_wrong_root",
      CaseInlineHandlerNormalizationRejectsWrongRoot},
     {"inline_bare_root_prints_help", CaseInlineBareRootPrintsHelp},
+    {"inline_root_value_handler_help_row_prints", CaseInlineRootValueHandlerHelpRowPrints},
     {"inline_root_value_handler_joins_tokens", CaseInlineRootValueHandlerJoinsTokens},
     {"inline_missing_root_value_handler_errors", CaseInlineMissingRootValueHandlerErrors},
     {"optional_value_mode_allows_missing_value", CaseOptionalValueModeAllowsMissingValue},
