@@ -28,23 +28,23 @@ int main(int argc, char** argv) {
     spdlog::set_pattern("[%^%l%$] %v");
 
     const std::string exe_name = ExecutableName((argc > 0) ? argv[0] : nullptr);
+    kcli::PrimaryParser parser;
+    kcli::InlineParser alphaParser = kcli::demo::alpha::GetInlineParser();
 
     try {
-        kcli::Initialize(argc, argv, {.failure_mode = kcli::FailureMode::Throw});
-        kcli::ExpandAlias("-v", "--verbose");
-        kcli::ExpandAlias("-out", "--output");
-        kcli::ExpandAlias("-a", "--alpha-enable");
+        parser.setFailureMode(kcli::FailureMode::Throw);
+        parser.addInlineParser(alphaParser);
 
-        kcli::demo::alpha::ProcessCLI(argc, argv, {.failure_mode = kcli::FailureMode::Throw});
+        parser.addAlias("-v", "--verbose");
+        parser.addAlias("-out", "--output");
+        parser.addAlias("-a", "--alpha-enable");
 
-        kcli::Initialize(argc, argv, {.failure_mode = kcli::FailureMode::Throw});
-        kcli::SetHandler("--verbose", handleVerbose, "Enable verbose app logging.");
-        kcli::SetHandler("--output",
-                         handleOutput,
-                         "Set app output target.",
-                         kcli::ValueMode::Required);
-        kcli::Process();
-        kcli::FailOnUnknown();
+        parser.setHandler("--verbose", handleVerbose, "Enable verbose app logging.");
+        parser.setHandler("--output",
+                          handleOutput,
+                          "Set app output target.",
+                          kcli::ValueMode::Required);
+        parser.parse(argc, argv);
     } catch (const std::exception& ex) {
         spdlog::error("CLI error: {}", ex.what());
         return 2;

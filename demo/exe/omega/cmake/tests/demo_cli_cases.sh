@@ -6,13 +6,13 @@ usage() {
     echo "Cases:"
     echo "  unknown_alpha_option"
     echo "  unknown_beta_option"
-    echo "  unknown_renamed_option"
+    echo "  unknown_newgamma_option"
     echo "  known_alpha_option"
     echo "  alpha_multi_value"
     echo "  beta_workers_option"
-    echo "  renamed_tag_option"
+    echo "  newgamma_tag_option"
     echo "  alpha_help_root"
-    echo "  renamed_help_root"
+    echo "  newgamma_help_root"
     echo "  unknown_app_option"
     echo "  known_and_unknown_option"
     echo "  alpha_alias_option"
@@ -88,7 +88,7 @@ case "$test_case" in
             echo "Expected non-zero exit status for unknown alpha option" >&2
             exit 1
         fi
-        require_contains "$output" "unknown option --alpha-d (use --alpha to list options)"
+        require_contains "$output" "CLI error: unknown option --alpha-d"
         ;;
     unknown_beta_option)
         run_and_split --beta-z
@@ -96,15 +96,15 @@ case "$test_case" in
             echo "Expected non-zero exit status for unknown beta option" >&2
             exit 1
         fi
-        require_contains "$output" "unknown option --beta-z (use --beta to list options)"
+        require_contains "$output" "CLI error: unknown option --beta-z"
         ;;
-    unknown_renamed_option)
-        run_and_split --renamed-wut
+    unknown_newgamma_option)
+        run_and_split --newgamma-wut
         if [[ "$status" -eq 0 ]]; then
-            echo "Expected non-zero exit status for unknown renamed option" >&2
+            echo "Expected non-zero exit status for unknown newgamma option" >&2
             exit 1
         fi
-        require_contains "$output" "unknown option --renamed-wut (use --renamed to list options)"
+        require_contains "$output" "CLI error: unknown option --newgamma-wut"
         ;;
     known_alpha_option)
         run_and_split --alpha-message hello
@@ -142,16 +142,16 @@ case "$test_case" in
         require_contains "$output" "Processing --beta-workers with value \"8\""
         require_not_contains "$output" "CLI error:"
         ;;
-    renamed_tag_option)
-        run_and_split --renamed-tag prod
+    newgamma_tag_option)
+        run_and_split --newgamma-tag prod
         if [[ "$status" -ne 0 ]]; then
-            echo "Expected zero exit status for renamed tag option" >&2
+            echo "Expected zero exit status for newgamma tag option" >&2
             echo "--- output begin ---" >&2
             echo "$output" >&2
             echo "--- output end ---" >&2
             exit 1
         fi
-        require_contains "$output" "Processing --renamed-tag with value \"prod\""
+        require_contains "$output" "Processing --newgamma-tag with value \"prod\""
         require_not_contains "$output" "CLI error:"
         ;;
     alpha_help_root)
@@ -167,17 +167,17 @@ case "$test_case" in
         require_contains "$output" "--alpha-enable [value]"
         require_not_contains "$output" "CLI error:"
         ;;
-    renamed_help_root)
-        run_and_split --renamed
+    newgamma_help_root)
+        run_and_split --newgamma
         if [[ "$status" -ne 0 ]]; then
-            echo "Expected zero exit status for renamed help root" >&2
+            echo "Expected zero exit status for newgamma help root" >&2
             echo "--- output begin ---" >&2
             echo "$output" >&2
             echo "--- output end ---" >&2
             exit 1
         fi
-        require_contains "$output" "Available --renamed-* options:"
-        require_contains "$output" "--renamed-tag <value>"
+        require_contains "$output" "Available --newgamma-* options:"
+        require_contains "$output" "--newgamma-tag <value>"
         require_not_contains "$output" "CLI error:"
         ;;
     unknown_app_option)
@@ -194,8 +194,8 @@ case "$test_case" in
             echo "Expected non-zero exit status when mixing known and unknown options" >&2
             exit 1
         fi
-        require_contains "$output" "Processing --alpha-message with value \"hello\""
         require_contains "$output" "CLI error: unknown option --bogus"
+        require_not_contains "$output" "Processing --alpha-message with value \"hello\""
         ;;
     alpha_alias_option)
         run_and_split -a
@@ -274,8 +274,8 @@ case "$test_case" in
             echo "Expected non-zero exit status when passing '--'" >&2
             exit 1
         fi
-        require_contains "$output" "Processing --alpha-message with value \"hello\""
         require_contains "$output" "CLI error: unknown option --"
+        require_not_contains "$output" "Processing --alpha-message with value \"hello\""
         ;;
     *)
         echo "Error: unknown case '$test_case'" >&2

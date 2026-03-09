@@ -1,27 +1,12 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace kcli {
-
-enum class Mode {
-    EndUser,
-    Inline,
-};
-
-enum class RootMatchMode {
-    ExactOrDash,
-    Prefix,
-};
-
-enum class UnknownOptionPolicy {
-    Ignore,
-    Consume,
-    Error,
-};
 
 enum class ValueMode {
     None,
@@ -29,22 +14,7 @@ enum class ValueMode {
     Optional,
 };
 
-struct ParsePolicy {
-    // Inline-mode matching behavior for --<root> and --<root>-* parsing.
-    RootMatchMode root_match = RootMatchMode::ExactOrDash;
-
-    // Behavior for unknown options that look like --<root>-<something>.
-    UnknownOptionPolicy unknown_dash_option = UnknownOptionPolicy::Error;
-
-    // Behavior for unknown options that begin with root when root_match=Prefix.
-    UnknownOptionPolicy unknown_prefixed_option = UnknownOptionPolicy::Ignore;
-
-    // Whether option values reject tokens starting with '-'.
-    bool reject_dash_prefixed_values = true;
-};
-
 struct HandlerContext {
-    Mode mode = Mode::EndUser;
     std::string_view root{};
     std::string_view option{};
     std::string_view command{};
@@ -62,9 +32,6 @@ using ValueHandler = std::function<void(const HandlerContext&, std::string_view)
 // Positional handlers receive remaining positional tokens in
 // HandlerContext::value_tokens.
 using PositionalHandler = std::function<void(const HandlerContext&)>;
-using UnknownOptionHandler = std::function<void(std::string_view option)>;
-using ErrorHandler = std::function<void(std::string_view message)>;
-using WarningHandler = std::function<void(std::string_view message)>;
 
 enum class FailureMode {
     Return,
@@ -86,27 +53,67 @@ struct ProcessResult {
     explicit operator bool() const noexcept { return ok; }
 };
 
-struct SessionOptions {
-    // Empty root selects end-user mode. Accepts either "build" or "--build".
-    std::string_view root{};
-    FailureMode failure_mode = FailureMode::Return;
-    ParsePolicy policy{};
+namespace detail {
+struct InlineParserData;
+struct PrimaryParserData;
+}  // namespace detail
+
+class InlineParser {
+public:
+    explicit InlineParser(std::string_view root);
+    InlineParser(const InlineParser& other);
+    InlineParser& operator=(const InlineParser& other);
+    InlineParser(InlineParser&& other) noexcept;
+    InlineParser& operator=(InlineParser&& other) noexcept;
+    ~InlineParser();
+
+    void setRoot(std::string_view root);
+
+    void setRootValueHandler(ValueHandler handler);
+
+    void setHandler(std::string_view option,
+                    FlagHandler handler,
+                    std::string_view description);
+    void setHandler(std::string_view option,
+                    ValueHandler handler,
+                    std::string_view description,
+                    ValueMode mode = ValueMode::Required);
+
+private:
+    std::unique_ptr<detail::InlineParserData> data_;
+
+    friend class PrimaryParser;
 };
 
-// Procedural parse-session API.
-void Initialize(int& argc, char** argv, const SessionOptions& options = {});
-bool ExpandAlias(std::string_view alias, std::string_view target);
-void SetRootValueHandler(ValueHandler handler);
-void SetHandler(std::string_view option,
-                FlagHandler handler,
-                std::string_view description);
-void SetHandler(std::string_view option,
-                ValueHandler handler,
-                std::string_view description,
-                ValueMode mode = ValueMode::Required);
-void SetPositionalHandler(PositionalHandler handler);
-void ClearPositionalHandler();
-ProcessResult Process();
-ProcessResult FailOnUnknown();
+class PrimaryParser {
+public:
+    PrimaryParser();
+    PrimaryParser(const PrimaryParser&) = delete;
+    PrimaryParser& operator=(const PrimaryParser&) = delete;
+    PrimaryParser(PrimaryParser&& other) noexcept;
+    PrimaryParser& operator=(PrimaryParser&& other) noexcept;
+    ~PrimaryParser();
+
+    void setFailureMode(FailureMode failure_mode);
+
+    void addAlias(std::string_view alias, std::string_view target);
+
+    void setHandler(std::string_view option,
+                    FlagHandler handler,
+                    std::string_view description);
+    void setHandler(std::string_view option,
+                    ValueHandler handler,
+                    std::string_view description,
+                    ValueMode mode = ValueMode::Required);
+
+    void setPositionalHandler(PositionalHandler handler);
+
+    void addInlineParser(InlineParser parser);
+
+    ProcessResult parse(int& argc, char** argv);
+
+private:
+    std::unique_ptr<detail::PrimaryParserData> data_;
+};
 
 }  // namespace kcli

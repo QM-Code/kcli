@@ -17,10 +17,10 @@ add_test(
 )
 
 add_test(
-    NAME demo_cli_unknown_renamed_option_errors
+    NAME demo_cli_unknown_newgamma_option_errors
     COMMAND ${KCLI_DEMO_CLI_CASES_SCRIPT}
             $<TARGET_FILE:kcli_demo_omega>
-            unknown_renamed_option
+            unknown_newgamma_option
 )
 
 add_test(
@@ -45,10 +45,10 @@ add_test(
 )
 
 add_test(
-    NAME demo_cli_renamed_tag_option_ok
+    NAME demo_cli_newgamma_tag_option_ok
     COMMAND ${KCLI_DEMO_CLI_CASES_SCRIPT}
             $<TARGET_FILE:kcli_demo_omega>
-            renamed_tag_option
+            newgamma_tag_option
 )
 
 add_test(
@@ -59,10 +59,10 @@ add_test(
 )
 
 add_test(
-    NAME demo_cli_renamed_help_root_ok
+    NAME demo_cli_newgamma_help_root_ok
     COMMAND ${KCLI_DEMO_CLI_CASES_SCRIPT}
             $<TARGET_FILE:kcli_demo_omega>
-            renamed_help_root
+            newgamma_help_root
 )
 
 add_test(

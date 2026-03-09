@@ -12,14 +12,54 @@
 
 namespace {
 
-using kcli::backend::CommandBinding;
-using kcli::backend::ParseState;
+using kcli::detail::CommandBinding;
+using kcli::detail::InlineParserData;
+using kcli::detail::PrimaryParserData;
 
-bool IsUsableValueToken(std::string_view value, bool reject_dash_prefixed) {
+enum class InvocationKind {
+    Flag,
+    Value,
+    Positional,
+    PrintHelp,
+};
+
+struct Invocation {
+    InvocationKind kind = InvocationKind::Flag;
+    std::string root{};
+    std::string option{};
+    std::string command{};
+    std::vector<std::string> value_tokens{};
+    bool from_alias = false;
+    int option_index = -1;
+    kcli::FlagHandler flag_handler{};
+    kcli::ValueHandler value_handler{};
+    kcli::PositionalHandler positional_handler{};
+    std::vector<std::pair<std::string, std::string>> help_rows{};
+};
+
+struct CollectedValues {
+    bool has_value = false;
+    std::vector<std::string> parts{};
+    int last_index = -1;
+};
+
+struct InlineTokenMatch {
+    enum class Kind {
+        None,
+        BareRoot,
+        DashOption,
+    };
+
+    Kind kind = Kind::None;
+    const InlineParserData* parser = nullptr;
+    std::string suffix{};
+};
+
+bool IsCollectableFollowOnValueToken(std::string_view value) {
     if (value.empty()) {
         return false;
     }
-    if (reject_dash_prefixed && value.front() == '-') {
+    if (value.front() == '-') {
         return false;
     }
     return true;
@@ -47,12 +87,6 @@ std::string JoinWithSpaces(const std::vector<std::string>& parts) {
     return joined;
 }
 
-struct CollectedValues {
-    bool has_value = false;
-    std::vector<std::string> parts{};
-    int last_index = -1;
-};
-
 void ReportError(kcli::ProcessResult& result,
                  std::string_view option,
                  std::string_view message) {
@@ -67,7 +101,7 @@ CollectedValues CollectValueTokens(int option_index,
                                    int argc,
                                    char** argv,
                                    std::vector<bool>& consumed,
-                                   bool reject_dash_prefixed_values) {
+                                   bool allow_option_like_first_value) {
     CollectedValues collected{};
     collected.last_index = option_index;
 
@@ -84,7 +118,10 @@ CollectedValues CollectValueTokens(int option_index,
     }
 
     const std::string first = kcli::detail::TrimWhitespace(std::string_view(argv[first_value_index]));
-    if (!IsUsableValueToken(first, reject_dash_prefixed_values)) {
+    if (first.empty()) {
+        return collected;
+    }
+    if (!allow_option_like_first_value && first.front() == '-') {
         return collected;
     }
 
@@ -92,6 +129,10 @@ CollectedValues CollectValueTokens(int option_index,
     collected.parts.push_back(first);
     consumed[static_cast<std::size_t>(first_value_index)] = true;
     collected.last_index = first_value_index;
+
+    if (allow_option_like_first_value && first.front() == '-') {
+        return collected;
+    }
 
     for (int scan = first_value_index + 1; scan < argc; ++scan) {
         if (argv[scan] == nullptr) {
@@ -102,10 +143,7 @@ CollectedValues CollectValueTokens(int option_index,
         }
 
         const std::string next = kcli::detail::TrimWhitespace(std::string_view(argv[scan]));
-        if (next.empty()) {
-            break;
-        }
-        if (next.front() == '-') {
+        if (!IsCollectableFollowOnValueToken(next)) {
             break;
         }
 
@@ -117,55 +155,18 @@ CollectedValues CollectValueTokens(int option_index,
     return collected;
 }
 
-bool HasBoundArgv(const ParseState& state, kcli::ProcessResult& result) {
-    if (state.argc_ptr == nullptr) {
-        ReportError(result,
-                    "",
-                    "kcli is not initialized; call kcli::Initialize(argc, argv) first");
-        return false;
-    }
-
-    if (*state.argc_ptr > 0 && state.argv == nullptr) {
-        ReportError(result,
-                    "",
-                    "kcli received invalid argv (argc > 0 but argv is null)");
-        return false;
-    }
-
-    return true;
-}
-
-void PrintInlineRootHelp(const ParseState& state) {
-    const std::string prefix = "--" + state.root_name + "-";
-    std::cout << "\nAvailable --" << state.root_name << "-* options:\n";
-
-    std::vector<std::pair<std::string, std::string>> rows;
-    rows.reserve(state.command_order.size());
+void PrintHelp(const Invocation& invocation) {
+    std::cout << "\nAvailable --" << invocation.root << "-* options:\n";
 
     std::size_t max_lhs = 0;
-    for (const std::string& command : state.command_order) {
-        const auto it = state.commands.find(command);
-        if (it == state.commands.end()) {
-            continue;
-        }
-        const CommandBinding& binding = it->second;
-
-        std::string lhs = prefix + command;
-        if (binding.expects_value) {
-            if (binding.value_mode == kcli::ValueMode::Optional) {
-                lhs.append(" [value]");
-            } else if (binding.value_mode == kcli::ValueMode::Required) {
-                lhs.append(" <value>");
-            }
-        }
-        max_lhs = std::max(max_lhs, lhs.size());
-        rows.emplace_back(std::move(lhs), binding.description);
+    for (const auto& row : invocation.help_rows) {
+        max_lhs = std::max(max_lhs, row.first.size());
     }
 
-    if (rows.empty()) {
+    if (invocation.help_rows.empty()) {
         std::cout << "  (no options registered)\n";
     } else {
-        for (const auto& row : rows) {
+        for (const auto& row : invocation.help_rows) {
             std::cout << "  " << row.first;
             const std::size_t padding = max_lhs > row.first.size() ? (max_lhs - row.first.size()) : 0;
             for (std::size_t i = 0; i < padding + 2; ++i) {
@@ -190,109 +191,151 @@ void ConsumeIndex(std::vector<bool>& consumed,
     }
 }
 
-bool DispatchCommand(ParseState& state,
-                     const std::string& command,
-                     const std::string& option_token,
-                     int& i,
-                     int argc,
-                     std::vector<bool>& consumed,
-                     kcli::ProcessResult& result) {
-    const auto it = state.commands.find(command);
-    if (it == state.commands.end()) {
-        return false;
+const CommandBinding* FindCommand(const std::vector<std::pair<std::string, CommandBinding>>& commands,
+                                  std::string_view command) {
+    for (const auto& entry : commands) {
+        if (entry.first == command) {
+            return &entry.second;
+        }
+    }
+    return nullptr;
+}
+
+std::vector<std::pair<std::string, std::string>> BuildHelpRows(const InlineParserData& parser) {
+    const std::string prefix = "--" + parser.root_name + "-";
+    std::vector<std::pair<std::string, std::string>> rows;
+    rows.reserve(parser.commands.size());
+
+    for (const auto& [command, binding] : parser.commands) {
+        std::string lhs = prefix + command;
+        if (binding.expects_value) {
+            if (binding.value_mode == kcli::ValueMode::Optional) {
+                lhs.append(" [value]");
+            } else if (binding.value_mode == kcli::ValueMode::Required) {
+                lhs.append(" <value>");
+            }
+        }
+        rows.emplace_back(std::move(lhs), binding.description);
     }
 
-    const CommandBinding& binding = it->second;
+    return rows;
+}
+
+InlineTokenMatch MatchInlineToken(const PrimaryParserData& data, std::string_view arg) {
+    for (const InlineParserData& parser : data.inline_parsers) {
+        const std::string root_option = "--" + parser.root_name;
+        if (arg == root_option) {
+            return {.kind = InlineTokenMatch::Kind::BareRoot, .parser = &parser};
+        }
+
+        const std::string root_dash_prefix = root_option + "-";
+        if (kcli::detail::StartsWith(arg, root_dash_prefix)) {
+            return {
+                .kind = InlineTokenMatch::Kind::DashOption,
+                .parser = &parser,
+                .suffix = std::string(arg.substr(root_dash_prefix.size())),
+            };
+        }
+    }
+
+    return {};
+}
+
+bool ScheduleInvocation(const CommandBinding& binding,
+                        std::string_view root,
+                        std::string_view command,
+                        std::string_view option_token,
+                        bool from_alias,
+                        int& i,
+                        int argc,
+                        char** argv,
+                        std::vector<bool>& consumed,
+                        std::vector<Invocation>& invocations,
+                        kcli::ProcessResult& result) {
     ConsumeIndex(consumed, result, i);
 
-    kcli::HandlerContext context{};
-    context.mode = state.mode;
-    context.root = state.root_name;
-    context.option = option_token;
-    context.command = command;
-    context.from_alias = false;
-    context.option_index = i;
+    Invocation invocation{};
+    invocation.root = std::string(root);
+    invocation.option = std::string(option_token);
+    invocation.command = std::string(command);
+    invocation.from_alias = from_alias;
+    invocation.option_index = i;
 
-    try {
-        if (!binding.expects_value) {
-            binding.flag_handler(context);
-            return true;
-        }
-
-        if (binding.value_mode == kcli::ValueMode::None) {
-            binding.value_handler(context, std::string_view{});
-            return true;
-        }
-
-        const CollectedValues collected =
-            CollectValueTokens(i, argc, state.argv, consumed, state.policy.reject_dash_prefixed_values);
-        const bool has_value = collected.has_value;
-        std::string value = JoinWithSpaces(collected.parts);
-        result.stats.consumed_values += static_cast<int>(collected.parts.size());
-
-        if (!has_value && binding.value_mode == kcli::ValueMode::Required) {
-            ReportError(result,
-                        option_token,
-                        "option '" + option_token + "' requires a value");
-            return true;
-        }
-
-        if (has_value) {
-            i = collected.last_index;
-        } else {
-            value.clear();
-        }
-
-        context.value_tokens.reserve(collected.parts.size());
-        for (const std::string& token : collected.parts) {
-            context.value_tokens.push_back(token);
-        }
-        binding.value_handler(context, value);
-        return true;
-    } catch (const std::exception& ex) {
-        ReportError(result, option_token, ex.what());
-        return true;
-    } catch (...) {
-        ReportError(result, option_token, "unknown exception while handling option");
+    if (!binding.expects_value) {
+        invocation.kind = InvocationKind::Flag;
+        invocation.flag_handler = binding.flag_handler;
+        invocations.push_back(std::move(invocation));
         return true;
     }
+
+    if (binding.value_mode == kcli::ValueMode::None) {
+        invocation.kind = InvocationKind::Value;
+        invocation.value_handler = binding.value_handler;
+        invocations.push_back(std::move(invocation));
+        return true;
+    }
+
+    const CollectedValues collected = CollectValueTokens(i,
+                                                         argc,
+                                                         argv,
+                                                         consumed,
+                                                         binding.value_mode == kcli::ValueMode::Required);
+    result.stats.consumed_values += static_cast<int>(collected.parts.size());
+
+    if (!collected.has_value && binding.value_mode == kcli::ValueMode::Required) {
+        ReportError(result, option_token, "option '" + std::string(option_token) + "' requires a value");
+        return true;
+    }
+
+    if (collected.has_value) {
+        i = collected.last_index;
+    }
+
+    invocation.kind = InvocationKind::Value;
+    invocation.value_handler = binding.value_handler;
+    invocation.value_tokens = collected.parts;
+    invocations.push_back(std::move(invocation));
+    return true;
 }
 
-void ApplyUnknownPolicy(const ParseState& state,
-                        kcli::UnknownOptionPolicy policy_value,
-                        const std::string& option_token,
-                        int index,
+void SchedulePositionals(const PrimaryParserData& data,
+                        int argc,
+                        char** argv,
                         std::vector<bool>& consumed,
-                        kcli::ProcessResult& result) {
-    switch (policy_value) {
-    case kcli::UnknownOptionPolicy::Ignore:
+                        std::vector<Invocation>& invocations) {
+    if (!data.positional_handler || argc <= 1 || argv == nullptr) {
         return;
-    case kcli::UnknownOptionPolicy::Consume:
-        ConsumeIndex(consumed, result, index);
-        return;
-    case kcli::UnknownOptionPolicy::Error:
-        ConsumeIndex(consumed, result, index);
-        if (state.mode == kcli::Mode::Inline && !state.root_name.empty()) {
-            ReportError(result,
-                        option_token,
-                        "unknown option " + option_token +
-                            " (use --" + state.root_name + " to list options)");
-        } else {
-            ReportError(result, option_token, "unknown option " + option_token);
+    }
+
+    Invocation invocation{};
+    invocation.kind = InvocationKind::Positional;
+    invocation.positional_handler = data.positional_handler;
+
+    for (int i = 1; i < argc; ++i) {
+        if (argv[i] == nullptr || consumed[static_cast<std::size_t>(i)]) {
+            continue;
         }
-        return;
+
+        const std::string_view token(argv[i]);
+        if (!token.empty() && token.front() != '-') {
+            if (invocation.option_index < 0) {
+                invocation.option_index = i;
+            }
+            consumed[static_cast<std::size_t>(i)] = true;
+            invocation.value_tokens.emplace_back(token);
+        }
+    }
+
+    if (!invocation.value_tokens.empty()) {
+        invocations.push_back(std::move(invocation));
     }
 }
 
-void CompactArgv(ParseState& state,
-                 std::vector<bool>& consumed,
+void CompactArgv(int& argc,
+                 char** argv,
+                 const std::vector<bool>& consumed,
                  kcli::ProcessResult& result) {
-    if (state.argc_ptr == nullptr) {
-        return;
-    }
-
-    const int argc = *state.argc_ptr;
-    if (argc <= 0 || state.argv == nullptr) {
+    if (argc <= 0 || argv == nullptr) {
         result.stats.remaining_argc = std::max(argc, 0);
         return;
     }
@@ -300,169 +343,232 @@ void CompactArgv(ParseState& state,
     int write_index = 1;
     for (int read_index = 1; read_index < argc; ++read_index) {
         if (!consumed[static_cast<std::size_t>(read_index)]) {
-            state.argv[write_index++] = state.argv[read_index];
+            argv[write_index++] = argv[read_index];
         }
     }
+
     if (write_index < argc) {
-        state.argv[write_index] = nullptr;
+        argv[write_index] = nullptr;
     }
 
-    *state.argc_ptr = write_index;
+    argc = write_index;
     result.stats.remaining_argc = write_index;
 }
 
-kcli::ProcessResult ProcessInline(ParseState& state) {
-    kcli::ProcessResult result{};
-    if (!HasBoundArgv(state, result)) {
+void ExecuteInvocations(const std::vector<Invocation>& invocations,
+                       kcli::ProcessResult& result) {
+    for (const Invocation& invocation : invocations) {
+        if (!result.ok) {
+            return;
+        }
+
+        if (invocation.kind == InvocationKind::PrintHelp) {
+            PrintHelp(invocation);
+            continue;
+        }
+
+        kcli::HandlerContext context{};
+        context.root = invocation.root;
+        context.option = invocation.option;
+        context.command = invocation.command;
+        context.from_alias = invocation.from_alias;
+        context.option_index = invocation.option_index;
+        context.value_tokens.reserve(invocation.value_tokens.size());
+        for (const std::string& token : invocation.value_tokens) {
+            context.value_tokens.push_back(token);
+        }
+
+        try {
+            switch (invocation.kind) {
+            case InvocationKind::Flag:
+                invocation.flag_handler(context);
+                break;
+            case InvocationKind::Value:
+                invocation.value_handler(context, JoinWithSpaces(invocation.value_tokens));
+                break;
+            case InvocationKind::Positional:
+                invocation.positional_handler(context);
+                break;
+            case InvocationKind::PrintHelp:
+                break;
+            }
+        } catch (const std::exception& ex) {
+            ReportError(result, invocation.option, ex.what());
+        } catch (...) {
+            ReportError(result, invocation.option, "unknown exception while handling option");
+        }
+    }
+}
+
+}  // namespace
+
+namespace kcli::detail {
+
+ProcessResult Parse(PrimaryParserData& data, int& argc, char** argv) {
+    ProcessResult result{};
+    if (argc > 0 && argv == nullptr) {
+        result = MakeError("", "kcli received invalid argv (argc > 0 but argv is null)");
+        ApplyFailureMode(data.failure_mode, result);
         return result;
     }
 
-    const int argc = *state.argc_ptr;
-    if (argc <= 0 || state.argv == nullptr) {
+    if (argc <= 0 || argv == nullptr) {
         result.stats.remaining_argc = std::max(argc, 0);
         return result;
     }
 
     std::vector<bool> consumed(static_cast<std::size_t>(argc), false);
-    const std::string root_option = "--" + state.root_name;
-    const std::string root_dash_prefix = root_option + "-";
+    std::vector<bool> from_alias(static_cast<std::size_t>(argc), false);
+    std::vector<Invocation> invocations;
+
+    for (const AliasBinding& alias : data.aliases) {
+        for (int i = 1; i < argc; ++i) {
+            if (argv[i] == nullptr) {
+                continue;
+            }
+
+            const std::string_view token(argv[i]);
+            if (token != alias.alias) {
+                continue;
+            }
+
+            data.owned_tokens.push_back(alias.target);
+            argv[i] = data.owned_tokens.back().data();
+            from_alias[static_cast<std::size_t>(i)] = true;
+        }
+    }
 
     for (int i = 1; i < argc; ++i) {
-        if (state.argv[i] == nullptr) {
+        if (argv[i] == nullptr || consumed[static_cast<std::size_t>(i)]) {
             continue;
         }
 
-        const std::string arg = kcli::detail::TrimWhitespace(std::string_view(state.argv[i]));
+        const std::string arg = TrimWhitespace(std::string_view(argv[i]));
         if (arg.empty()) {
             continue;
         }
 
-        if (arg == root_option) {
-            const int option_index = i;
-            ConsumeIndex(consumed, result, i);
+        if (arg.front() != '-') {
+            continue;
+        }
 
-            const CollectedValues collected = CollectValueTokens(
-                option_index,
-                argc,
-                state.argv,
-                consumed,
-                state.policy.reject_dash_prefixed_values);
-            result.stats.consumed_values += static_cast<int>(collected.parts.size());
-            if (collected.has_value) {
+        if (arg == "--") {
+            continue;
+        }
+
+        if (StartsWith(arg, "--")) {
+            const InlineTokenMatch inline_match = MatchInlineToken(data, arg);
+            switch (inline_match.kind) {
+            case InlineTokenMatch::Kind::BareRoot: {
+                ConsumeIndex(consumed, result, i);
+                const CollectedValues collected =
+                    CollectValueTokens(i, argc, argv, consumed, false);
+                result.stats.consumed_values += static_cast<int>(collected.parts.size());
+
+                if (!collected.has_value) {
+                    Invocation help{};
+                    help.kind = InvocationKind::PrintHelp;
+                    help.root = inline_match.parser->root_name;
+                    help.help_rows = BuildHelpRows(*inline_match.parser);
+                    invocations.push_back(std::move(help));
+                    break;
+                }
+
+                if (!inline_match.parser->root_value_handler) {
+                    ReportError(result,
+                                arg,
+                                "unknown value for option '" + arg + "'");
+                    break;
+                }
+
+                Invocation invocation{};
+                invocation.kind = InvocationKind::Value;
+                invocation.root = inline_match.parser->root_name;
+                invocation.option = arg;
+                invocation.from_alias = from_alias[static_cast<std::size_t>(i)];
+                invocation.option_index = i;
+                invocation.value_handler = inline_match.parser->root_value_handler;
+                invocation.value_tokens = collected.parts;
+                invocations.push_back(std::move(invocation));
                 i = collected.last_index;
+                break;
             }
+            case InlineTokenMatch::Kind::DashOption: {
+                const CommandBinding* binding =
+                    FindCommand(inline_match.parser->commands, inline_match.suffix);
+                if (inline_match.suffix.empty() || binding == nullptr) {
+                    break;
+                }
 
-            if (!collected.has_value) {
-                PrintInlineRootHelp(state);
+                (void)ScheduleInvocation(*binding,
+                                         inline_match.parser->root_name,
+                                         inline_match.suffix,
+                                         arg,
+                                         from_alias[static_cast<std::size_t>(i)],
+                                         i,
+                                         argc,
+                                         argv,
+                                         consumed,
+                                         invocations,
+                                         result);
+                break;
+            }
+            case InlineTokenMatch::Kind::None: {
+                const std::string command = arg.substr(2);
+                const CommandBinding* binding = FindCommand(data.commands, command);
+                if (binding != nullptr) {
+                    (void)ScheduleInvocation(*binding,
+                                             "",
+                                             command,
+                                             arg,
+                                             from_alias[static_cast<std::size_t>(i)],
+                                             i,
+                                             argc,
+                                             argv,
+                                             consumed,
+                                             invocations,
+                                             result);
+                }
+                break;
+            }
+            }
+        }
+
+        if (!result.ok) {
+            break;
+        }
+    }
+
+    if (result.ok) {
+        SchedulePositionals(data, argc, argv, consumed, invocations);
+    }
+
+    CompactArgv(argc, argv, consumed, result);
+
+    if (result.ok) {
+        for (int i = 1; i < argc; ++i) {
+            if (argv[i] == nullptr) {
                 continue;
             }
 
-            if (!state.root_value_handler) {
-                ReportError(result,
-                            root_option,
-                            "unknown value for option '" + root_option + "'");
+            const std::string token = TrimWhitespace(std::string_view(argv[i]));
+            if (token.empty()) {
                 continue;
             }
-
-            kcli::HandlerContext context{};
-            context.mode = state.mode;
-            context.root = state.root_name;
-            context.option = root_option;
-            context.command = "";
-            context.from_alias = false;
-            context.option_index = option_index;
-            context.value_tokens.reserve(collected.parts.size());
-            for (const std::string& token : collected.parts) {
-                context.value_tokens.push_back(token);
+            if (token.front() == '-') {
+                ReportError(result, token, "unknown option " + token);
+                break;
             }
-
-            try {
-                state.root_value_handler(context, JoinWithSpaces(collected.parts));
-            } catch (const std::exception& ex) {
-                ReportError(result, root_option, ex.what());
-            } catch (...) {
-                ReportError(result,
-                            root_option,
-                            "unknown exception while handling option");
-            }
-            continue;
         }
-
-        if (kcli::detail::StartsWith(arg, root_dash_prefix)) {
-            const std::string command = arg.substr(root_dash_prefix.size());
-            if (command.empty() ||
-                !DispatchCommand(state, command, arg, i, argc, consumed, result)) {
-                ApplyUnknownPolicy(
-                    state,
-                    state.policy.unknown_dash_option,
-                    arg,
-                    i,
-                    consumed,
-                    result);
-            }
-            continue;
-        }
-
-        if (state.policy.root_match == kcli::RootMatchMode::Prefix &&
-            kcli::detail::StartsWith(arg, root_option)) {
-            ApplyUnknownPolicy(
-                state,
-                state.policy.unknown_prefixed_option,
-                arg,
-                i,
-                consumed,
-                result);
-            continue;
-        }
+        result.stats.remaining_argc = argc;
     }
 
-    CompactArgv(state, consumed, result);
+    if (result.ok) {
+        ExecuteInvocations(invocations, result);
+    }
+
+    ApplyFailureMode(data.failure_mode, result);
     return result;
 }
 
-kcli::ProcessResult ProcessEndUser(ParseState& state) {
-    kcli::ProcessResult result{};
-    if (!HasBoundArgv(state, result)) {
-        return result;
-    }
-
-    const int argc = *state.argc_ptr;
-    if (argc <= 0 || state.argv == nullptr) {
-        result.stats.remaining_argc = std::max(argc, 0);
-        return result;
-    }
-
-    std::vector<bool> consumed(static_cast<std::size_t>(argc), false);
-
-    for (int i = 1; i < argc; ++i) {
-        if (state.argv[i] == nullptr) {
-            continue;
-        }
-
-        const std::string arg = kcli::detail::TrimWhitespace(std::string_view(state.argv[i]));
-        if (arg.empty()) {
-            continue;
-        }
-
-        if (kcli::detail::StartsWith(arg, "--") && arg.size() > 2) {
-            const std::string command = arg.substr(2);
-            (void)DispatchCommand(state, command, arg, i, argc, consumed, result);
-        }
-    }
-
-    CompactArgv(state, consumed, result);
-    return result;
-}
-
-} // namespace
-
-namespace kcli::backend {
-
-ProcessResult Process(ParseState& state) {
-    if (state.mode == Mode::Inline) {
-        return ProcessInline(state);
-    }
-    return ProcessEndUser(state);
-}
-
-} // namespace kcli::backend
+}  // namespace kcli::detail

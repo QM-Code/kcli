@@ -30,48 +30,40 @@ void handleArgs(const kcli::HandlerContext&) {
 int main(int argc, char** argv) {
     spdlog::set_pattern("[%^%l%$] %v");
 
+    kcli::PrimaryParser parser;
+    kcli::InlineParser alphaParser = kcli::demo::alpha::GetInlineParser();
+    kcli::InlineParser betaParser = kcli::demo::beta::GetInlineParser();
+    kcli::InlineParser gammaParser = kcli::demo::gamma::GetInlineParser();
+    kcli::InlineParser inlineBuildParser("--build");
+
+    parser.setFailureMode(kcli::FailureMode::Throw);
+
+    gammaParser.setRoot("--newgamma");
+
+    parser.addInlineParser(alphaParser);
+    parser.addInlineParser(betaParser);
+    parser.addInlineParser(gammaParser);
+
+    parser.addAlias("-v", "--verbose");
+    parser.addAlias("-out", "--output");
+    parser.addAlias("-a", "--alpha-enable");
+    parser.addAlias("-b", "--build-profile");
+
+    inlineBuildParser.setHandler("-profile",
+                                 handleBuildProfile,
+                                 "Set build profile.",
+                                 kcli::ValueMode::Required);
+    inlineBuildParser.setHandler("-clean", handleBuildClean, "Enable clean build.");
+
+    parser.addInlineParser(inlineBuildParser);
+
+    parser.setHandler("--verbose", handleVerbose, "Enable verbose app logging.");
+    parser.setHandler("--output", handleOutput, "Set app output target.", kcli::ValueMode::Required);
+
+    parser.setPositionalHandler(handleArgs);
+
     try {
-        // With no root specified, this is end-user mode.
-        kcli::Initialize(argc, argv, {.failure_mode = kcli::FailureMode::Throw});
-
-        // Expand aliases before any library consumes its own root.
-        kcli::ExpandAlias("-v", "--verbose");
-        kcli::ExpandAlias("-out", "--output");
-        kcli::ExpandAlias("-a", "--alpha-enable");
-        kcli::ExpandAlias("-b", "--build-profile");
-
-        // Imported libraries consume their own inline namespaces.
-        kcli::demo::alpha::ProcessCLI(argc, argv, {.failure_mode = kcli::FailureMode::Throw});
-        kcli::demo::beta::ProcessCLI(argc, argv, {.failure_mode = kcli::FailureMode::Throw});
-        kcli::demo::gamma::ProcessCLI(
-            argc,
-            argv,
-            {.root = "--renamed", .failure_mode = kcli::FailureMode::Throw});
-
-        // App-defined inline namespace group (for example --build-*).
-        kcli::Initialize(
-            argc,
-            argv,
-            {.root = "--build", .failure_mode = kcli::FailureMode::Throw});
-        kcli::SetHandler("-profile",
-                         handleBuildProfile,
-                         "Set build profile.",
-                         kcli::ValueMode::Required);
-        kcli::SetHandler("-clean", handleBuildClean, "Enable clean build.");
-        kcli::Process();
-
-        // App-defined end-user options.
-        kcli::Initialize(argc, argv, {.failure_mode = kcli::FailureMode::Throw});
-        kcli::SetHandler("--verbose", handleVerbose, "Enable verbose app logging.");
-        kcli::SetHandler("--output",
-                         handleOutput,
-                         "Set app output target.",
-                         kcli::ValueMode::Required);
-        kcli::SetPositionalHandler(handleArgs);
-        kcli::Process();
-
-        // No option-like leftovers are allowed after all phases complete.
-        kcli::FailOnUnknown();
+        parser.parse(argc, argv);
     } catch (const std::exception& ex) {
         spdlog::error("CLI error: {}", ex.what());
         return 2;
@@ -82,6 +74,6 @@ int main(int argc, char** argv) {
     std::cout << "Enabled --<root> prefixes:\n";
     std::cout << "  --alpha\n";
     std::cout << "  --beta\n";
-    std::cout << "  --renamed (gamma override)\n\n";
+    std::cout << "  --newgamma (gamma override)\n\n";
     return 0;
 }

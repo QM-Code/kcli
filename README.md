@@ -40,25 +40,43 @@ Useful demo commands:
 ./demo/exe/core/build/latest/test --alpha-message "hello"
 ./demo/exe/core/build/latest/test --output stdout
 ./demo/exe/omega/build/latest/test --beta-workers 8
-./demo/exe/omega/build/latest/test --renamed-tag "prod"
+./demo/exe/omega/build/latest/test --newgamma-tag "prod"
 ./demo/exe/omega/build/latest/test --alpha-d
 ```
 
-## Parser Modes
+## Parser Objects
 
-- End-user mode (default): `Initialize(argc, argv)`  
-  Handles top-level options and aliases (for example `-v -> verbose`).
-- Inline mode: `Initialize(argc, argv, "root")`  
-  Handles `--<root>` and `--<root>-*` only.
+- `PrimaryParser`
+  Owns aliases, end-user handlers, inline parser registrations, and the single `parse(argc, argv)` pass.
+- `InlineParser`
+  Defines one inline root namespace such as `--alpha` or `--build` plus its `--<root>-*` handlers.
+
+Typical flow:
+
+```cpp
+kcli::PrimaryParser parser;
+kcli::InlineParser build("--build");
+
+build.setHandler("-profile", handleProfile, "Set build profile.", kcli::ValueMode::Required);
+parser.addInlineParser(build);
+
+parser.addAlias("-v", "--verbose");
+parser.setHandler("--verbose", handleVerbose, "Enable verbose logging.");
+parser.parse(argc, argv);
+```
 
 Inline mode behavior:
 - `--<root>` always prints available `--<root>-*` options.
 - `--<root> value [value...]` is accepted only when a root value handler is registered.
-- Unknown `--<root>-*` options hard-error.
-- Aliases are not allowed.
+- Required option values consume the next CLI token, even when it starts with `-`.
+- Optional values only start consuming when the next token looks like a value.
+- Unknown option-like tokens fail the parse.
+- Aliases are defined on the primary parser and expanded before dispatch.
+- Handlers run only after the full command line validates.
 
 Root token rules:
-- Root must be bare (for example `"trace"`, not `"--trace"`).
+- Roots can be configured as `"trace"` or `"--trace"`.
+- Inline roots only match `--<root>` and `--<root>-*`.
 - Roots beginning with `-` are rejected.
 
 ## Install

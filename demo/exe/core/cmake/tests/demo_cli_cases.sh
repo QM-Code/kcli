@@ -80,7 +80,7 @@ case "$test_case" in
             echo "Expected non-zero exit status for unknown alpha option" >&2
             exit 1
         fi
-        require_contains "$output" "unknown option --alpha-d (use --alpha to list options)"
+        require_contains "$output" "CLI error: unknown option --alpha-d"
         require_not_contains "$output" "KCLI demo core compile/link/integration check passed"
         ;;
     known_alpha_option)
@@ -183,7 +183,6 @@ case "$test_case" in
             echo "Expected non-zero exit status when passing '--'" >&2
             exit 1
         fi
-        require_contains "$output" "Processing --alpha-message with value \"hello\""
         require_contains "$output" "CLI error: unknown option --"
         require_not_contains "$output" "KCLI demo core compile/link/integration check passed"
         ;;

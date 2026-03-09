@@ -4,7 +4,7 @@
 
 namespace kcli::demo::gamma {
 
-ProcessResult ProcessCLI(int& argc, char** argv, const SessionOptions& options = {});
+kcli::InlineParser GetInlineParser();
 void EmitDemoOutput();
 
 } // namespace kcli::demo::gamma

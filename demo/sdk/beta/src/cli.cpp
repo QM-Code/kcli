@@ -52,22 +52,17 @@ void handleWorkers(const kcli::HandlerContext& context, std::string_view value) 
 
 namespace kcli::demo::beta {
 
-ProcessResult ProcessCLI(int& argc, char** argv, const SessionOptions& options) {
-    SessionOptions effective_options = options;
-    if (effective_options.root.empty()) {
-        effective_options.root = "--beta";
-    }
-
-    kcli::Initialize(argc, argv, effective_options);
-    kcli::SetHandler("-profile",
-                     handleProfile,
-                     "Select beta runtime profile.",
-                     kcli::ValueMode::Required);
-    kcli::SetHandler("-workers",
-                     handleWorkers,
-                     "Set beta worker count.",
-                     kcli::ValueMode::Required);
-    return kcli::Process();
+kcli::InlineParser GetInlineParser() {
+    kcli::InlineParser parser("--beta");
+    parser.setHandler("-profile",
+                      handleProfile,
+                      "Select beta runtime profile.",
+                      kcli::ValueMode::Required);
+    parser.setHandler("-workers",
+                      handleWorkers,
+                      "Set beta worker count.",
+                      kcli::ValueMode::Required);
+    return parser;
 }
 
 void EmitDemoOutput() {
