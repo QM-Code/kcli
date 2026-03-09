@@ -5,12 +5,8 @@
 #include <cstddef>
 #include <iostream>
 #include <stdexcept>
-#include <string>
 
 namespace {
-
-std::string g_message = "alpha-default";
-bool g_enabled = false;
 
 void PrintProcessingLine(const kcli::HandlerContext& context, std::string_view value) {
     if (context.value_tokens.empty()) {
@@ -35,14 +31,10 @@ void PrintProcessingLine(const kcli::HandlerContext& context, std::string_view v
 }
 
 void handleMessage(const kcli::HandlerContext& context, std::string_view value) {
-    if (!value.empty()) {
-        g_message = std::string(value);
-    }
     PrintProcessingLine(context, value);
 }
 
 void handleEnable(const kcli::HandlerContext& context, std::string_view value) {
-    g_enabled = true;
     PrintProcessingLine(context, value);
 }
 
@@ -61,11 +53,6 @@ kcli::InlineParser GetInlineParser() {
                       "Enable alpha processing.",
                       kcli::ValueMode::Optional);
     return parser;
-}
-
-void EmitDemoOutput() {
-    std::cout << "[alpha] enabled=" << std::boolalpha << g_enabled
-              << ", message='" << g_message << "'\n";
 }
 
 } // namespace kcli::demo::alpha

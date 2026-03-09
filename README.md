@@ -78,6 +78,7 @@ Inline mode behavior:
 - Required option values consume the next CLI token, even when it starts with `-`.
 - Optional values only start consuming when the next token looks like a value.
 - Unknown option-like tokens fail the parse.
+- Literal `--` is rejected as an unknown option; it is not treated as an option terminator.
 - Aliases are defined on the primary parser and expanded before dispatch.
 - Handlers run only after the full command line validates.
 - `parse()` throws `kcli::CliError` on failure.

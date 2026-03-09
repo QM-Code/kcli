@@ -6,13 +6,9 @@
 #include <cstddef>
 #include <iostream>
 #include <stdexcept>
-#include <string>
 #include <system_error>
 
 namespace {
-
-std::string g_profile = "safe";
-int g_workers = 2;
 
 int ParseIntOrThrow(std::string_view value) {
     int parsed = 0;
@@ -53,15 +49,12 @@ void PrintProcessingLine(const kcli::HandlerContext& context, std::string_view v
 }
 
 void handleProfile(const kcli::HandlerContext& context, std::string_view value) {
-    if (!value.empty()) {
-        g_profile = std::string(value);
-    }
     PrintProcessingLine(context, value);
 }
 
 void handleWorkers(const kcli::HandlerContext& context, std::string_view value) {
     if (!value.empty()) {
-        g_workers = ParseIntOrThrow(value);
+        (void)ParseIntOrThrow(value);
     }
     PrintProcessingLine(context, value);
 }
@@ -81,10 +74,6 @@ kcli::InlineParser GetInlineParser() {
                       "Set beta worker count.",
                       kcli::ValueMode::Required);
     return parser;
-}
-
-void EmitDemoOutput() {
-    std::cout << "[beta] profile='" << g_profile << "', workers=" << g_workers << "\n";
 }
 
 } // namespace kcli::demo::beta
