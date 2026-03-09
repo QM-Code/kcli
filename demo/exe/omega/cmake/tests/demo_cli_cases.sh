@@ -89,7 +89,7 @@ case "$test_case" in
             echo "Expected non-zero exit status for unknown alpha option" >&2
             exit 1
         fi
-        require_contains "$output" "CLI error: unknown option --alpha-d"
+        require_contains "$output" "[error] [cli] unknown option --alpha-d"
         ;;
     unknown_beta_option)
         run_and_split --beta-z
@@ -97,7 +97,7 @@ case "$test_case" in
             echo "Expected non-zero exit status for unknown beta option" >&2
             exit 1
         fi
-        require_contains "$output" "CLI error: unknown option --beta-z"
+        require_contains "$output" "[error] [cli] unknown option --beta-z"
         ;;
     unknown_newgamma_option)
         run_and_split --newgamma-wut
@@ -105,7 +105,7 @@ case "$test_case" in
             echo "Expected non-zero exit status for unknown newgamma option" >&2
             exit 1
         fi
-        require_contains "$output" "CLI error: unknown option --newgamma-wut"
+        require_contains "$output" "[error] [cli] unknown option --newgamma-wut"
         ;;
     known_alpha_option)
         run_and_split --alpha-message hello
@@ -149,7 +149,7 @@ case "$test_case" in
             echo "Expected non-zero exit status for invalid beta workers option" >&2
             exit 1
         fi
-        require_contains "$output" "CLI error: option '--beta-workers': expected an integer"
+        require_contains "$output" "[error] [cli] option '--beta-workers': expected an integer"
         require_not_contains "$output" "Processing --beta-workers"
         ;;
     newgamma_tag_option)
@@ -196,7 +196,7 @@ case "$test_case" in
             echo "Expected non-zero exit status for unknown app option" >&2
             exit 1
         fi
-        require_contains "$output" "CLI error: unknown option --bogus"
+        require_contains "$output" "[error] [cli] unknown option --bogus"
         ;;
     known_and_unknown_option)
         run_and_split --alpha-message hello --bogus
@@ -204,7 +204,7 @@ case "$test_case" in
             echo "Expected non-zero exit status when mixing known and unknown options" >&2
             exit 1
         fi
-        require_contains "$output" "CLI error: unknown option --bogus"
+        require_contains "$output" "[error] [cli] unknown option --bogus"
         require_not_contains "$output" "Processing --alpha-message with value \"hello\""
         ;;
     alpha_alias_option)
@@ -284,7 +284,7 @@ case "$test_case" in
             echo "Expected non-zero exit status when passing '--'" >&2
             exit 1
         fi
-        require_contains "$output" "CLI error: unknown option --"
+        require_contains "$output" "[error] [cli] unknown option --"
         require_not_contains "$output" "Processing --alpha-message with value \"hello\""
         ;;
     *)

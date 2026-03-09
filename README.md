@@ -63,12 +63,7 @@ parser.addInlineParser(build);
 parser.addAlias("-v", "--verbose");
 parser.setHandler("--verbose", handleVerbose, "Enable verbose logging.");
 
-try {
-    parser.parse(argc, argv);
-} catch (const kcli::CliError& ex) {
-    std::cerr << "CLI error: " << ex.what() << "\n";
-    return 2;
-}
+parser.parse(argc, argv);
 ```
 
 Inline mode behavior:
@@ -82,7 +77,8 @@ Inline mode behavior:
 - Aliases are defined on the primary parser and expanded before dispatch.
 - Handlers run only after the full command line validates.
 - `parse(argc, argv)` reads the caller's argument vector without rewriting or compacting it.
-- `parse()` throws `kcli::CliError` on failure.
+- `parse()` reports invalid CLI input to `stderr` as `[error] [cli] ...`, colors `error` red and `cli` blue on terminals, and exits with code `2`.
+- `parseOrThrow()` is available when a caller needs to intercept `kcli::CliError` directly.
 
 Root token rules:
 - Roots can be configured as `"trace"` or `"--trace"`.

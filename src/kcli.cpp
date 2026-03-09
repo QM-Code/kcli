@@ -2,9 +2,40 @@
 
 #include "kcli/backend.hpp"
 
+#include <cstdio>
+#include <cstdlib>
+#include <memory>
 #include <utility>
 
+#if defined(_WIN32)
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
+
 namespace kcli {
+
+namespace {
+
+bool StderrSupportsColor() {
+#if defined(_WIN32)
+    return _isatty(_fileno(stderr)) != 0;
+#else
+    return isatty(fileno(stderr)) != 0;
+#endif
+}
+
+[[noreturn]] void ReportCliErrorAndExit(const char* message) {
+    if (StderrSupportsColor()) {
+        std::fprintf(stderr, "[\x1b[31merror\x1b[0m] [\x1b[94mcli\x1b[0m] %s\n", message);
+    } else {
+        std::fprintf(stderr, "[error] [cli] %s\n", message);
+    }
+    std::fflush(stderr);
+    std::exit(2);
+}
+
+}  // namespace
 
 CliError::CliError(std::string option, std::string message)
     : std::runtime_error(message.empty() ? "kcli parse failed" : message),
@@ -106,6 +137,14 @@ void PrimaryParser::addInlineParser(InlineParser parser) {
 }
 
 void PrimaryParser::parse(int argc, char* const* argv) {
+    try {
+        parseOrThrow(argc, argv);
+    } catch (const CliError& ex) {
+        ReportCliErrorAndExit(ex.what());
+    }
+}
+
+void PrimaryParser::parseOrThrow(int argc, char* const* argv) {
     detail::Parse(*data_, argc, argv);
 }
 

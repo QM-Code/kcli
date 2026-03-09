@@ -100,6 +100,7 @@ public:
     void addInlineParser(InlineParser parser);
 
     void parse(int argc, char* const* argv);
+    void parseOrThrow(int argc, char* const* argv);
 
 private:
     std::unique_ptr<detail::PrimaryParserData> data_;

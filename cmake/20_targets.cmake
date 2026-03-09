@@ -32,7 +32,8 @@ if(KCLI_BUILD_STATIC)
             $<INSTALL_INTERFACE:include>
     )
 
-    target_link_libraries(kcli_sdk_static PUBLIC spdlog::spdlog)
+    # Add link dependencies here when needed.
+    # target_link_libraries(kcli_sdk_static PUBLIC some::dependency)
 
     set_target_properties(kcli_sdk_static PROPERTIES
         OUTPUT_NAME kcli
@@ -50,7 +51,8 @@ if(KCLI_BUILD_SHARED)
             $<INSTALL_INTERFACE:include>
     )
 
-    target_link_libraries(kcli_sdk_shared PUBLIC spdlog::spdlog)
+    # Add link dependencies here when needed.
+    # target_link_libraries(kcli_sdk_shared PUBLIC some::dependency)
 
     set_target_properties(kcli_sdk_shared PROPERTIES
         OUTPUT_NAME kcli

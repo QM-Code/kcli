@@ -1,4 +1,4 @@
-find_package(spdlog CONFIG REQUIRED)
+# No explicit dependencies defined in config cmake.dependencies.
 
 # ktools local-build layout guard:
 #

@@ -14,11 +14,6 @@
       "package_name": "KcliSDK"
     }
   },
-  "vcpkg": {
-    "dependencies": [
-      "spdlog"
-    ]
-  },
   "build": {
     "jobs": 4,
     "type": "shared",

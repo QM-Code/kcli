@@ -279,9 +279,9 @@ void CaseEndUserKnownOptionsWithUnknownOptionError(TestContext& t) {
     const CapturedCliError error = ExpectCliError(
         t,
         [&] {
-            return parser.parse(args.argc, args.data());
+            return parser.parseOrThrow(args.argc, args.data());
         },
-        "unknown end-user options should fail the parse");
+        "parseOrThrow() should fail for unknown end-user options");
 
     t.Expect(!verbose, "handlers should not run before the full command line validates");
     t.ExpectEq(output, std::string(), "value handlers should not run on invalid command lines");
@@ -335,9 +335,9 @@ void CaseAddAliasRewritesAfterDoubleDash(TestContext& t) {
     const CapturedCliError error = ExpectCliError(
         t,
         [&] {
-            return parser.parse(args.argc, args.data());
+            return parser.parseOrThrow(args.argc, args.data());
         },
-        "literal '--' should make the overall parse fail");
+        "parseOrThrow() should reject literal '--'");
 
     t.Expect(!verbose, "handlers should not run before the full command line validates");
     t.ExpectEq(error.option, std::string("--"), "literal '--' should be reported as the error token");
@@ -576,9 +576,9 @@ void CaseInlineMissingRootValueHandlerErrors(TestContext& t) {
     const CapturedCliError error = ExpectCliError(
         t,
         [&] {
-            return parser.parse(args.argc, args.data());
+            return parser.parseOrThrow(args.argc, args.data());
         },
-        "root values should error when no root value handler is registered");
+        "parseOrThrow() should error when no root value handler is registered");
 
     t.ExpectEq(error.option, std::string("--build"), "root value errors should identify the root option");
     t.ExpectContains(error.message,
@@ -668,9 +668,9 @@ void CaseRequiredValueModeRejectsMissingValue(TestContext& t) {
     const CapturedCliError error = ExpectCliError(
         t,
         [&] {
-            return parser.parse(args.argc, args.data());
+            return parser.parseOrThrow(args.argc, args.data());
         },
-        "required value handlers should reject missing values");
+        "parseOrThrow() should reject missing required values");
 
     t.ExpectEq(error.option,
                std::string("--build-value"),
@@ -718,9 +718,9 @@ void CaseUnknownInlineOptionErrors(TestContext& t) {
     const CapturedCliError error = ExpectCliError(
         t,
         [&] {
-            return parser.parse(args.argc, args.data());
+            return parser.parseOrThrow(args.argc, args.data());
         },
-        "unknown inline options should fail the parse");
+        "parseOrThrow() should fail for unknown inline options");
 
     t.ExpectEq(error.option,
                std::string("--build-unknown"),
@@ -740,9 +740,9 @@ void CaseUnknownOptionReportsDoubleDash(TestContext& t) {
     const CapturedCliError error = ExpectCliError(
         t,
         [&] {
-            return parser.parse(args.argc, args.data());
+            return parser.parseOrThrow(args.argc, args.data());
         },
-        "parse() should reject literal '--'");
+        "parseOrThrow() should reject literal '--'");
 
     t.ExpectEq(error.option, std::string("--"), "parse() should report literal '--' as unknown");
 }
@@ -755,9 +755,9 @@ void CaseUnknownOptionThrowsCliError(TestContext& t) {
     const CapturedCliError error = ExpectCliError(
         t,
         [&] {
-            return parser.parse(args.argc, args.data());
+            return parser.parseOrThrow(args.argc, args.data());
         },
-        "parse() should throw CliError for unknown options");
+        "parseOrThrow() should throw CliError for unknown options");
 
     t.ExpectEq(error.option, std::string("--bogus"), "unknown options should identify the token");
     t.ExpectContains(error.message,
@@ -778,9 +778,9 @@ void CaseOptionHandlerExceptionThrowsCliError(TestContext& t) {
     const CapturedCliError error = ExpectCliError(
         t,
         [&] {
-            return parser.parse(args.argc, args.data());
+            return parser.parseOrThrow(args.argc, args.data());
         },
-        "option handler exceptions should throw CliError");
+        "parseOrThrow() should surface option handler exceptions as CliError");
 
     t.ExpectEq(error.option, std::string("--verbose"), "option handler failures should report the option");
     t.ExpectContains(error.message, "option boom", "thrown option messages should be preserved");
@@ -799,9 +799,9 @@ void CasePositionalHandlerExceptionThrowsCliError(TestContext& t) {
     const CapturedCliError error = ExpectCliError(
         t,
         [&] {
-            return parser.parse(args.argc, args.data());
+            return parser.parseOrThrow(args.argc, args.data());
         },
-        "positional handler exceptions should throw CliError");
+        "parseOrThrow() should surface positional handler exceptions as CliError");
 
     t.ExpectEq(error.option, std::string(), "positional failures should not report an option token");
     t.ExpectContains(error.message, "positional boom", "positional messages should be preserved");

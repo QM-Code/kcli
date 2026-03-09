@@ -2,9 +2,7 @@
 #include <beta/sdk.hpp>
 #include <gamma/sdk.hpp>
 #include <kcli.hpp>
-#include <spdlog/spdlog.h>
 
-#include <exception>
 #include <iostream>
 #include <string_view>
 
@@ -28,8 +26,6 @@ void handleArgs(const kcli::HandlerContext&) {
 } // namespace
 
 int main(int argc, char** argv) {
-    spdlog::set_pattern("[%^%l%$] %v");
-
     kcli::PrimaryParser parser;
     kcli::InlineParser alphaParser = kcli::demo::alpha::GetInlineParser();
     kcli::InlineParser betaParser = kcli::demo::beta::GetInlineParser();
@@ -60,12 +56,7 @@ int main(int argc, char** argv) {
 
     parser.setPositionalHandler(handleArgs);
 
-    try {
-        parser.parse(argc, argv);
-    } catch (const kcli::CliError& ex) {
-        spdlog::error("CLI error: {}", ex.what());
-        return 2;
-    }
+    parser.parse(argc, argv);
 
     std::cout << "\nUsage:\n";
     std::cout << "  kcli_demo_omega --<root>\n\n";
@@ -75,3 +66,4 @@ int main(int argc, char** argv) {
     std::cout << "  --newgamma (gamma override)\n\n";
     return 0;
 }
+
