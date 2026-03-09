@@ -19,10 +19,6 @@ struct HandlerContext {
     std::string_view root{};
     std::string_view option{};
     std::string_view command{};
-    // Shell-tokenized value parts consumed for this option.
-    // Examples:
-    // - --alpha-message "hey bud"  => {"hey bud"}
-    // - --alpha-message hey bud    => {"hey", "bud"}
     std::vector<std::string_view> value_tokens{};
     bool from_alias = false;
     int option_index = -1;
@@ -34,23 +30,15 @@ using ValueHandler = std::function<void(const HandlerContext&, std::string_view)
 // HandlerContext::value_tokens.
 using PositionalHandler = std::function<void(const HandlerContext&)>;
 
-struct ProcessStats {
-    int consumed_options = 0;
-    int consumed_values = 0;
-    int remaining_argc = 0;
-};
-
 class CliError : public std::runtime_error {
 public:
-    CliError(std::string option, std::string message, ProcessStats stats);
+    CliError(std::string option, std::string message);
     ~CliError() override;
 
     std::string_view option() const noexcept;
-    const ProcessStats& stats() const noexcept;
 
 private:
     std::string option_;
-    ProcessStats stats_{};
 };
 
 namespace detail {
@@ -108,7 +96,7 @@ public:
 
     void addInlineParser(InlineParser parser);
 
-    ProcessStats parse(int& argc, char** argv);
+    void parse(int& argc, char** argv);
 
 private:
     std::unique_ptr<detail::PrimaryParserData> data_;

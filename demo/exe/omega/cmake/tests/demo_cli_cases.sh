@@ -10,6 +10,7 @@ usage() {
     echo "  known_alpha_option"
     echo "  alpha_multi_value"
     echo "  beta_workers_option"
+    echo "  beta_workers_invalid_option"
     echo "  newgamma_tag_option"
     echo "  alpha_help_root"
     echo "  newgamma_help_root"
@@ -141,6 +142,15 @@ case "$test_case" in
         fi
         require_contains "$output" "Processing --beta-workers with value \"8\""
         require_not_contains "$output" "CLI error:"
+        ;;
+    beta_workers_invalid_option)
+        run_and_split --beta-workers abc
+        if [[ "$status" -eq 0 ]]; then
+            echo "Expected non-zero exit status for invalid beta workers option" >&2
+            exit 1
+        fi
+        require_contains "$output" "CLI error: option '--beta-workers': expected an integer"
+        require_not_contains "$output" "Processing --beta-workers"
         ;;
     newgamma_tag_option)
         run_and_split --newgamma-tag prod

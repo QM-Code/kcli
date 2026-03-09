@@ -205,10 +205,8 @@ void AddInlineParser(kcli::PrimaryParser& parser,
 }
 
 struct CapturedCliError {
-    bool threw = false;
     std::string option{};
     std::string message{};
-    kcli::ProcessStats stats{};
 };
 
 template <typename Fn>
@@ -219,10 +217,8 @@ CapturedCliError ExpectCliError(TestContext& t,
         (void)fn();
     } catch (const kcli::CliError& ex) {
         CapturedCliError captured{};
-        captured.threw = true;
         captured.option = std::string(ex.option());
         captured.message = ex.what();
-        captured.stats = ex.stats();
         return captured;
     } catch (const std::exception& ex) {
         t.Expect(false, message);
@@ -242,10 +238,7 @@ void CasePrimaryParserEmptyParseSucceeds(TestContext& t) {
     ArgvFixture args{"prog"};
     kcli::PrimaryParser parser;
 
-    const kcli::ProcessResult result = parser.parse(args.argc, args.data());
-
-    t.Expect(result.ok, "empty primary parser should parse successfully");
-    t.ExpectEq(result.stats.remaining_argc, 1, "argv[0] should remain");
+    parser.parse(args.argc, args.data());
     t.ExpectEq(args.CurrentTokens(), std::vector<std::string>{"prog"}, "argv should remain unchanged");
 }
 
@@ -283,21 +276,22 @@ void CaseEndUserKnownOptionsWithUnknownOptionError(TestContext& t) {
             positionals = CopyTokens(context.value_tokens);
         });
 
-    const kcli::ProcessResult result = parser.parse(args.argc, args.data());
+    const CapturedCliError error = ExpectCliError(
+        t,
+        [&] {
+            return parser.parse(args.argc, args.data());
+        },
+        "unknown end-user options should fail the parse");
 
-    t.Expect(!result.ok, "unknown end-user options should fail the parse");
     t.Expect(!verbose, "handlers should not run before the full command line validates");
     t.ExpectEq(output, std::string(), "value handlers should not run on invalid command lines");
     t.ExpectEq(positionals,
                std::vector<std::string>{},
                "positional handlers should not run on invalid command lines");
-    t.ExpectEq(result.stats.consumed_options, 2, "known end-user options should be counted");
-    t.ExpectEq(result.stats.consumed_values, 1, "consumed value tokens should be counted");
-    t.ExpectEq(result.error_option, std::string("--bogus"), "the unknown option should be reported");
-    t.ExpectContains(result.error_message,
+    t.ExpectEq(error.option, std::string("--bogus"), "the unknown option should be reported");
+    t.ExpectContains(error.message,
                      "unknown option --bogus",
                      "unknown end-user options should surface the standard error");
-    t.ExpectEq(result.stats.remaining_argc, 2, "only argv[0] and the unknown option should remain");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--bogus"},
                "argv should be compacted after parsing");
@@ -317,9 +311,8 @@ void CaseAddAliasRewritesTokens(TestContext& t) {
                       },
                       "Enable verbose logging.");
 
-    const kcli::ProcessResult result = parser.parse(args.argc, args.data());
+    (void)parser.parse(args.argc, args.data());
 
-    t.Expect(result.ok, "alias-expanded token should parse normally");
     t.Expect(verbose, "alias-expanded token should trigger the registered handler");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "tail"},
@@ -339,11 +332,15 @@ void CaseAddAliasRewritesAfterDoubleDash(TestContext& t) {
                       },
                       "Enable verbose logging.");
 
-    const kcli::ProcessResult result = parser.parse(args.argc, args.data());
+    const CapturedCliError error = ExpectCliError(
+        t,
+        [&] {
+            return parser.parse(args.argc, args.data());
+        },
+        "literal '--' should make the overall parse fail");
 
-    t.Expect(!result.ok, "literal '--' should make the overall parse fail");
     t.Expect(!verbose, "handlers should not run before the full command line validates");
-    t.ExpectEq(result.error_option, std::string("--"), "literal '--' should be reported as the error token");
+    t.ExpectEq(error.option, std::string("--"), "literal '--' should be reported as the error token");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--"},
                "only the literal '--' token should remain");
@@ -419,12 +416,10 @@ void CaseInlineHandlerNormalizationAcceptsShortAndFullForms(TestContext& t) {
                                      kcli::ValueMode::Required);
         });
 
-    const kcli::ProcessResult result = parser.parse(args.argc, args.data());
-
-    t.Expect(result.ok, "inline handlers should accept short and fully-qualified registration forms");
+    parser.parse(args.argc, args.data());
     t.Expect(flag, "short-form inline handler should dispatch");
     t.ExpectEq(value, std::string("data"), "fully-qualified inline handler should dispatch");
-    t.ExpectEq(result.stats.remaining_argc, 1, "all known inline tokens should be consumed");
+    t.ExpectEq(args.CurrentTokens(), std::vector<std::string>{"prog"}, "all known inline tokens should be consumed");
 }
 
 void CaseInlineHandlerNormalizationRejectsWrongRoot(TestContext& t) {
@@ -461,12 +456,10 @@ void CaseInlineBareRootPrintsHelp(TestContext& t) {
         });
 
     CaptureStdout capture;
-    const kcli::ProcessResult result = parser.parse(args.argc, args.data());
+    parser.parse(args.argc, args.data());
     const std::string output = capture.str();
 
-    t.Expect(result.ok, "bare inline root should print help instead of failing");
-    t.ExpectEq(result.stats.consumed_options, 1, "bare inline root should count as a consumed option");
-    t.ExpectEq(result.stats.remaining_argc, 1, "bare inline root should be removed from argv");
+    t.ExpectEq(args.CurrentTokens(), std::vector<std::string>{"prog"}, "bare inline root should be removed from argv");
     t.ExpectContains(output,
                      "Available --build-* options:",
                      "bare inline root should print the option listing header");
@@ -500,18 +493,14 @@ void CaseInlineRootValueHandlerJoinsTokens(TestContext& t) {
                 });
         });
 
-    const kcli::ProcessResult result = parser.parse(args.argc, args.data());
-
-    t.Expect(result.ok, "root value handler should accept bare root values");
+    parser.parse(args.argc, args.data());
     t.ExpectEq(received_value, std::string("fast mode"), "root value handler should receive joined text");
     t.ExpectEq(received_tokens,
                std::vector<std::string>{"fast", "mode"},
                "root value handler should receive tokenized parts");
     t.ExpectEq(received_option, std::string("--build"), "root value handler should report the root token");
     t.ExpectEq(option_index, 1, "root value handler should report the option index");
-    t.ExpectEq(result.stats.consumed_options, 1, "root value processing should count the root option");
-    t.ExpectEq(result.stats.consumed_values, 2, "root value processing should count consumed value tokens");
-    t.ExpectEq(result.stats.remaining_argc, 1, "root value processing should remove consumed tokens");
+    t.ExpectEq(args.CurrentTokens(), std::vector<std::string>{"prog"}, "root value processing should remove consumed tokens");
 }
 
 void CaseInlineMissingRootValueHandlerErrors(TestContext& t) {
@@ -519,14 +508,20 @@ void CaseInlineMissingRootValueHandlerErrors(TestContext& t) {
 
     kcli::PrimaryParser parser;
     parser.addInlineParser(kcli::InlineParser("--build"));
-    const kcli::ProcessResult result = parser.parse(args.argc, args.data());
+    const CapturedCliError error = ExpectCliError(
+        t,
+        [&] {
+            return parser.parse(args.argc, args.data());
+        },
+        "root values should error when no root value handler is registered");
 
-    t.Expect(!result.ok, "root values should error when no root value handler is registered");
-    t.ExpectEq(result.error_option, std::string("--build"), "root value errors should identify the root option");
-    t.ExpectContains(result.error_message,
+    t.ExpectEq(error.option, std::string("--build"), "root value errors should identify the root option");
+    t.ExpectContains(error.message,
                      "unknown value for option '--build'",
                      "root value errors should explain the missing handler");
-    t.ExpectEq(result.stats.remaining_argc, 1, "the failing root/value pair should still be consumed");
+    t.ExpectEq(args.CurrentTokens(),
+               std::vector<std::string>{"prog"},
+               "the failing root/value pair should still be consumed");
 }
 
 void CaseOptionalValueModeAllowsMissingValue(TestContext& t) {
@@ -551,15 +546,13 @@ void CaseOptionalValueModeAllowsMissingValue(TestContext& t) {
                                      kcli::ValueMode::Optional);
         });
 
-    const kcli::ProcessResult result = parser.parse(args.argc, args.data());
-
-    t.Expect(result.ok, "optional value handlers should accept missing values");
+    parser.parse(args.argc, args.data());
     t.Expect(called, "optional value handler should still run");
     t.ExpectEq(received_value, std::string(), "optional value handler should receive an empty value");
     t.ExpectEq(received_tokens,
                std::vector<std::string>{},
                "optional value handler should receive no token parts when omitted");
-    t.ExpectEq(result.stats.remaining_argc, 1, "optional value option should still be consumed");
+    t.ExpectEq(args.CurrentTokens(), std::vector<std::string>{"prog"}, "optional value option should still be consumed");
 }
 
 void CaseValueModeNoneDoesNotConsumeFollowingTokens(TestContext& t) {
@@ -582,12 +575,9 @@ void CaseValueModeNoneDoesNotConsumeFollowingTokens(TestContext& t) {
                                      kcli::ValueMode::None);
         });
 
-    const kcli::ProcessResult result = parser.parse(args.argc, args.data());
-
-    t.Expect(result.ok, "ValueMode::None handlers should parse successfully");
+    parser.parse(args.argc, args.data());
     t.Expect(called, "ValueMode::None handler should run");
     t.ExpectEq(received_value, std::string(), "ValueMode::None handler should receive an empty value");
-    t.ExpectEq(result.stats.consumed_values, 0, "ValueMode::None should not consume following tokens");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "data"},
                "ValueMode::None should leave the following token untouched");
@@ -608,13 +598,17 @@ void CaseRequiredValueModeRejectsMissingValue(TestContext& t) {
                                      kcli::ValueMode::Required);
         });
 
-    const kcli::ProcessResult result = parser.parse(args.argc, args.data());
+    const CapturedCliError error = ExpectCliError(
+        t,
+        [&] {
+            return parser.parse(args.argc, args.data());
+        },
+        "required value handlers should reject missing values");
 
-    t.Expect(!result.ok, "required value handlers should reject missing values");
-    t.ExpectEq(result.error_option,
+    t.ExpectEq(error.option,
                std::string("--build-value"),
                "required value errors should identify the failing option");
-    t.ExpectContains(result.error_message,
+    t.ExpectContains(error.message,
                      "requires a value",
                      "required value errors should explain the missing value");
     t.ExpectEq(args.CurrentTokens(),
@@ -641,11 +635,9 @@ void CaseRequiredValueModeAcceptsDashPrefixedFirstValue(TestContext& t) {
                 kcli::ValueMode::Required);
         });
 
-    const kcli::ProcessResult result = parser.parse(args.argc, args.data());
-
-    t.Expect(result.ok, "required value handlers should accept dash-prefixed first values");
+    parser.parse(args.argc, args.data());
     t.ExpectEq(value, std::string("-debug"), "handler should receive the dash-prefixed value");
-    t.ExpectEq(result.stats.remaining_argc, 1, "accepted dash-prefixed value should be consumed");
+    t.ExpectEq(args.CurrentTokens(), std::vector<std::string>{"prog"}, "accepted dash-prefixed value should be consumed");
 }
 
 void CaseUnknownInlineOptionErrors(TestContext& t) {
@@ -654,13 +646,17 @@ void CaseUnknownInlineOptionErrors(TestContext& t) {
     kcli::PrimaryParser parser;
     parser.addInlineParser(kcli::InlineParser("--build"));
 
-    const kcli::ProcessResult result = parser.parse(args.argc, args.data());
+    const CapturedCliError error = ExpectCliError(
+        t,
+        [&] {
+            return parser.parse(args.argc, args.data());
+        },
+        "unknown inline options should fail the parse");
 
-    t.Expect(!result.ok, "unknown inline options should fail the parse");
-    t.ExpectEq(result.error_option,
+    t.ExpectEq(error.option,
                std::string("--build-unknown"),
                "unknown inline options should report the token");
-    t.ExpectContains(result.error_message,
+    t.ExpectContains(error.message,
                      "unknown option --build-unknown",
                      "unknown inline options should surface the standard error");
     t.ExpectEq(args.CurrentTokens(),
@@ -668,31 +664,39 @@ void CaseUnknownInlineOptionErrors(TestContext& t) {
                "unknown inline options should remain in argv");
 }
 
-void CaseUnknownOptionReturnModeReportsDoubleDash(TestContext& t) {
+void CaseUnknownOptionReportsDoubleDash(TestContext& t) {
     ArgvFixture args{"prog", "--"};
 
     kcli::PrimaryParser parser;
-    const kcli::ProcessResult result = parser.parse(args.argc, args.data());
+    const CapturedCliError error = ExpectCliError(
+        t,
+        [&] {
+            return parser.parse(args.argc, args.data());
+        },
+        "parse() should reject literal '--'");
 
-    t.Expect(!result.ok, "parse() should reject literal '--'");
-    t.ExpectEq(result.error_option, std::string("--"), "parse() should report literal '--' as unknown");
+    t.ExpectEq(error.option, std::string("--"), "parse() should report literal '--' as unknown");
 }
 
-void CaseUnknownOptionThrowModeThrows(TestContext& t) {
+void CaseUnknownOptionThrowsCliError(TestContext& t) {
     ArgvFixture args{"prog", "--bogus"};
 
     kcli::PrimaryParser parser;
-    parser.setFailureMode(kcli::FailureMode::Throw);
 
-    t.ExpectThrowContains<std::runtime_error>(
+    const CapturedCliError error = ExpectCliError(
+        t,
         [&] {
-            (void)parser.parse(args.argc, args.data());
+            return parser.parse(args.argc, args.data());
         },
-        "unknown option --bogus",
-        "parse() should throw in FailureMode::Throw for unknown options");
+        "parse() should throw CliError for unknown options");
+
+    t.ExpectEq(error.option, std::string("--bogus"), "unknown options should identify the token");
+    t.ExpectContains(error.message,
+                     "unknown option --bogus",
+                     "unknown options should preserve the human-facing message");
 }
 
-void CaseOptionHandlerExceptionReturnMode(TestContext& t) {
+void CaseOptionHandlerExceptionThrowsCliError(TestContext& t) {
     ArgvFixture args{"prog", "--verbose"};
 
     kcli::PrimaryParser parser;
@@ -702,33 +706,19 @@ void CaseOptionHandlerExceptionReturnMode(TestContext& t) {
                       },
                       "Enable verbose logging.");
 
-    const kcli::ProcessResult result = parser.parse(args.argc, args.data());
-
-    t.Expect(!result.ok, "option handler exceptions should be captured in return mode");
-    t.ExpectEq(result.error_option, std::string("--verbose"), "option handler failures should report the option");
-    t.ExpectContains(result.error_message, "option boom", "thrown option messages should be preserved");
-}
-
-void CaseOptionHandlerExceptionThrowMode(TestContext& t) {
-    ArgvFixture args{"prog", "--verbose"};
-
-    kcli::PrimaryParser parser;
-    parser.setFailureMode(kcli::FailureMode::Throw);
-    parser.setHandler("--verbose",
-                      [&](const kcli::HandlerContext&) {
-                          throw std::runtime_error("option boom");
-                      },
-                      "Enable verbose logging.");
-
-    t.ExpectThrowContains<std::runtime_error>(
+    const CapturedCliError error = ExpectCliError(
+        t,
         [&] {
-            (void)parser.parse(args.argc, args.data());
+            return parser.parse(args.argc, args.data());
         },
-        "option boom",
-        "option handler exceptions should throw in FailureMode::Throw");
+        "option handler exceptions should throw CliError");
+
+    t.ExpectEq(error.option, std::string("--verbose"), "option handler failures should report the option");
+    t.ExpectContains(error.message, "option boom", "thrown option messages should be preserved");
+    t.ExpectContains(error.message, "--verbose", "handler failures should include the option token");
 }
 
-void CasePositionalHandlerExceptionReturnMode(TestContext& t) {
+void CasePositionalHandlerExceptionThrowsCliError(TestContext& t) {
     ArgvFixture args{"prog", "tail"};
 
     kcli::PrimaryParser parser;
@@ -737,29 +727,15 @@ void CasePositionalHandlerExceptionReturnMode(TestContext& t) {
             throw std::runtime_error("positional boom");
         });
 
-    const kcli::ProcessResult result = parser.parse(args.argc, args.data());
-
-    t.Expect(!result.ok, "positional handler exceptions should be captured in return mode");
-    t.ExpectEq(result.error_option, std::string(), "positional failures should not report an option token");
-    t.ExpectContains(result.error_message, "positional boom", "positional messages should be preserved");
-}
-
-void CasePositionalHandlerExceptionThrowMode(TestContext& t) {
-    ArgvFixture args{"prog", "tail"};
-
-    kcli::PrimaryParser parser;
-    parser.setFailureMode(kcli::FailureMode::Throw);
-    parser.setPositionalHandler(
-        [&](const kcli::HandlerContext&) {
-            throw std::runtime_error("positional boom");
-        });
-
-    t.ExpectThrowContains<std::runtime_error>(
+    const CapturedCliError error = ExpectCliError(
+        t,
         [&] {
-            (void)parser.parse(args.argc, args.data());
+            return parser.parse(args.argc, args.data());
         },
-        "positional boom",
-        "positional handler exceptions should throw in FailureMode::Throw");
+        "positional handler exceptions should throw CliError");
+
+    t.ExpectEq(error.option, std::string(), "positional failures should not report an option token");
+    t.ExpectContains(error.message, "positional boom", "positional messages should be preserved");
 }
 
 void CaseSinglePassProcessingConsumesInlineEndUserAndPositionals(TestContext& t) {
@@ -791,9 +767,8 @@ void CaseSinglePassProcessingConsumesInlineEndUserAndPositionals(TestContext& t)
         [&](const kcli::HandlerContext& context) {
             positionals = CopyTokens(context.value_tokens);
         });
-    const kcli::ProcessResult result = parser.parse(args.argc, args.data());
+    (void)parser.parse(args.argc, args.data());
 
-    t.Expect(result.ok, "single-pass parse should succeed");
     t.ExpectEq(alpha_message, std::string("hello"), "inline option should be consumed in the same pass");
     t.ExpectEq(output, std::string("stdout"), "end-user option should be consumed in the same pass");
     t.ExpectEq(positionals, std::vector<std::string>{"tail"}, "remaining positionals should be consumed");
@@ -816,9 +791,8 @@ void CaseInlineParserRootOverrideApplies(TestContext& t) {
     gamma.setRoot("--newgamma");
     parser.addInlineParser(gamma);
 
-    const kcli::ProcessResult result = parser.parse(args.argc, args.data());
+    (void)parser.parse(args.argc, args.data());
 
-    t.Expect(result.ok, "overridden root should parse successfully");
     t.ExpectEq(tag, std::string("prod"), "overridden root should dispatch registered handlers");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog"},
@@ -865,13 +839,10 @@ const std::pair<std::string_view, CaseFunction> kCases[] = {
     {"required_value_mode_accepts_dash_prefixed_first_value",
      CaseRequiredValueModeAcceptsDashPrefixedFirstValue},
     {"unknown_inline_option_errors", CaseUnknownInlineOptionErrors},
-    {"unknown_option_return_mode_reports_double_dash",
-     CaseUnknownOptionReturnModeReportsDoubleDash},
-    {"unknown_option_throw_mode_throws", CaseUnknownOptionThrowModeThrows},
-    {"option_handler_exception_return_mode", CaseOptionHandlerExceptionReturnMode},
-    {"option_handler_exception_throw_mode", CaseOptionHandlerExceptionThrowMode},
-    {"positional_handler_exception_return_mode", CasePositionalHandlerExceptionReturnMode},
-    {"positional_handler_exception_throw_mode", CasePositionalHandlerExceptionThrowMode},
+    {"unknown_option_reports_double_dash", CaseUnknownOptionReportsDoubleDash},
+    {"unknown_option_throws_cli_error", CaseUnknownOptionThrowsCliError},
+    {"option_handler_exception_throws_cli_error", CaseOptionHandlerExceptionThrowsCliError},
+    {"positional_handler_exception_throws_cli_error", CasePositionalHandlerExceptionThrowsCliError},
     {"single_pass_processing_consumes_inline_end_user_and_positionals",
      CaseSinglePassProcessingConsumesInlineEndUserAndPositionals},
     {"inline_parser_root_override_applies", CaseInlineParserRootOverrideApplies},

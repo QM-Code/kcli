@@ -45,6 +45,13 @@ add_test(
 )
 
 add_test(
+    NAME demo_cli_beta_workers_invalid_option_errors
+    COMMAND ${KCLI_DEMO_CLI_CASES_SCRIPT}
+            $<TARGET_FILE:kcli_demo_omega>
+            beta_workers_invalid_option
+)
+
+add_test(
     NAME demo_cli_newgamma_tag_option_ok
     COMMAND ${KCLI_DEMO_CLI_CASES_SCRIPT}
             $<TARGET_FILE:kcli_demo_omega>

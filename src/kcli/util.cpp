@@ -140,19 +140,19 @@ std::string NormalizeDescriptionOrThrow(std::string_view raw_description) {
     return description;
 }
 
-ProcessResult MakeError(std::string_view option, std::string_view message) {
-    ProcessResult result{};
+ParseOutcome MakeError(std::string_view option, std::string_view message) {
+    ParseOutcome result{};
     result.ok = false;
     result.error_option = std::string(option);
     result.error_message = std::string(message);
     return result;
 }
 
-[[noreturn]] void ThrowCliError(const ProcessResult& result) {
+[[noreturn]] void ThrowCliError(const ParseOutcome& result) {
     if (result.ok) {
         throw std::logic_error("kcli internal error: ThrowCliError called without a failure");
     }
-    throw kcli::CliError(result.error_option, result.error_message, result.stats);
+    throw kcli::CliError(result.error_option, result.error_message);
 }
 
 }  // namespace kcli::detail

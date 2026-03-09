@@ -2,15 +2,33 @@
 
 #include <kcli.hpp>
 
+#include <charconv>
 #include <cstddef>
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 
 namespace {
 
 std::string g_profile = "safe";
 int g_workers = 2;
+
+int ParseIntOrThrow(std::string_view value) {
+    int parsed = 0;
+    const char* begin = value.data();
+    const char* end = begin + value.size();
+
+    const auto [ptr, ec] = std::from_chars(begin, end, parsed);
+    if (ec == std::errc::result_out_of_range) {
+        throw std::runtime_error("integer is out of range");
+    }
+    if (ec != std::errc{} || ptr != end) {
+        throw std::runtime_error("expected an integer");
+    }
+
+    return parsed;
+}
 
 void PrintProcessingLine(const kcli::HandlerContext& context, std::string_view value) {
     if (context.value_tokens.empty()) {
@@ -43,7 +61,7 @@ void handleProfile(const kcli::HandlerContext& context, std::string_view value) 
 
 void handleWorkers(const kcli::HandlerContext& context, std::string_view value) {
     if (!value.empty()) {
-        g_workers = std::stoi(std::string(value));
+        g_workers = ParseIntOrThrow(value);
     }
     PrintProcessingLine(context, value);
 }

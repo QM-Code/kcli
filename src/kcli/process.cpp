@@ -14,8 +14,8 @@ namespace {
 
 using kcli::detail::CommandBinding;
 using kcli::detail::InlineParserData;
+using kcli::detail::ParseOutcome;
 using kcli::detail::PrimaryParserData;
-using kcli::detail::ProcessResult;
 
 enum class InvocationKind {
     Flag,
@@ -95,7 +95,7 @@ std::string FormatOptionErrorMessage(std::string_view option, std::string_view m
     return "option '" + std::string(option) + "': " + std::string(message);
 }
 
-void ReportError(ProcessResult& result,
+void ReportError(ParseOutcome& result,
                  std::string_view option,
                  std::string_view message) {
     if (result.ok) {
@@ -187,7 +187,6 @@ void PrintHelp(const Invocation& invocation) {
 }
 
 void ConsumeIndex(std::vector<bool>& consumed,
-                  ProcessResult& result,
                   int index) {
     if (index < 0 || static_cast<std::size_t>(index) >= consumed.size()) {
         return;
@@ -195,7 +194,6 @@ void ConsumeIndex(std::vector<bool>& consumed,
 
     if (!consumed[static_cast<std::size_t>(index)]) {
         consumed[static_cast<std::size_t>(index)] = true;
-        result.stats.consumed_options++;
     }
 }
 
@@ -259,8 +257,8 @@ bool ScheduleInvocation(const CommandBinding& binding,
                         char** argv,
                         std::vector<bool>& consumed,
                         std::vector<Invocation>& invocations,
-                        ProcessResult& result) {
-    ConsumeIndex(consumed, result, i);
+                        ParseOutcome& result) {
+    ConsumeIndex(consumed, i);
 
     Invocation invocation{};
     invocation.root = std::string(root);
@@ -288,7 +286,6 @@ bool ScheduleInvocation(const CommandBinding& binding,
                                                          argv,
                                                          consumed,
                                                          binding.value_mode == kcli::ValueMode::Required);
-    result.stats.consumed_values += static_cast<int>(collected.parts.size());
 
     if (!collected.has_value && binding.value_mode == kcli::ValueMode::Required) {
         ReportError(result, option_token, "option '" + std::string(option_token) + "' requires a value");
@@ -341,10 +338,8 @@ void SchedulePositionals(const PrimaryParserData& data,
 
 void CompactArgv(int& argc,
                  char** argv,
-                 const std::vector<bool>& consumed,
-                 ProcessResult& result) {
+                 const std::vector<bool>& consumed) {
     if (argc <= 0 || argv == nullptr) {
-        result.stats.remaining_argc = std::max(argc, 0);
         return;
     }
 
@@ -360,11 +355,10 @@ void CompactArgv(int& argc,
     }
 
     argc = write_index;
-    result.stats.remaining_argc = write_index;
 }
 
 void ExecuteInvocations(const std::vector<Invocation>& invocations,
-                       ProcessResult& result) {
+                       ParseOutcome& result) {
     for (const Invocation& invocation : invocations) {
         if (!result.ok) {
             return;
@@ -415,16 +409,15 @@ void ExecuteInvocations(const std::vector<Invocation>& invocations,
 
 namespace kcli::detail {
 
-ProcessStats Parse(PrimaryParserData& data, int& argc, char** argv) {
-    ProcessResult result{};
+void Parse(PrimaryParserData& data, int& argc, char** argv) {
+    ParseOutcome result{};
     if (argc > 0 && argv == nullptr) {
         result = MakeError("", "kcli received invalid argv (argc > 0 but argv is null)");
         ThrowCliError(result);
     }
 
     if (argc <= 0 || argv == nullptr) {
-        result.stats.remaining_argc = std::max(argc, 0);
-        return result.stats;
+        return;
     }
 
     std::vector<bool> consumed(static_cast<std::size_t>(argc), false);
@@ -470,10 +463,9 @@ ProcessStats Parse(PrimaryParserData& data, int& argc, char** argv) {
             const InlineTokenMatch inline_match = MatchInlineToken(data, arg);
             switch (inline_match.kind) {
             case InlineTokenMatch::Kind::BareRoot: {
-                ConsumeIndex(consumed, result, i);
+                ConsumeIndex(consumed, i);
                 const CollectedValues collected =
                     CollectValueTokens(i, argc, argv, consumed, false);
-                result.stats.consumed_values += static_cast<int>(collected.parts.size());
 
                 if (!collected.has_value) {
                     Invocation help{};
@@ -553,7 +545,7 @@ ProcessStats Parse(PrimaryParserData& data, int& argc, char** argv) {
         SchedulePositionals(data, argc, argv, consumed, invocations);
     }
 
-    CompactArgv(argc, argv, consumed, result);
+    CompactArgv(argc, argv, consumed);
 
     if (result.ok) {
         for (int i = 1; i < argc; ++i) {
@@ -570,7 +562,6 @@ ProcessStats Parse(PrimaryParserData& data, int& argc, char** argv) {
                 break;
             }
         }
-        result.stats.remaining_argc = argc;
     }
 
     if (result.ok) {
@@ -580,7 +571,6 @@ ProcessStats Parse(PrimaryParserData& data, int& argc, char** argv) {
     if (!result.ok) {
         ThrowCliError(result);
     }
-    return result.stats;
 }
 
 }  // namespace kcli::detail

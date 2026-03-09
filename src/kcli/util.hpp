@@ -20,14 +20,13 @@ std::string NormalizeAliasOrThrow(std::string_view raw_alias);
 std::string NormalizeAliasTargetOrThrow(std::string_view raw_target);
 std::string NormalizeDescriptionOrThrow(std::string_view raw_description);
 
-struct ProcessResult {
+struct ParseOutcome {
     bool ok = true;
-    ProcessStats stats{};
     std::string error_option{};
     std::string error_message{};
 };
 
-ProcessResult MakeError(std::string_view option, std::string_view message);
-[[noreturn]] void ThrowCliError(const ProcessResult& result);
+ParseOutcome MakeError(std::string_view option, std::string_view message);
+[[noreturn]] void ThrowCliError(const ParseOutcome& result);
 
 }  // namespace kcli::detail

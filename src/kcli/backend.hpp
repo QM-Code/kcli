@@ -61,6 +61,6 @@ void SetPrimaryHandler(PrimaryParserData& data,
                        ValueMode mode);
 void SetPositionalHandler(PrimaryParserData& data, PositionalHandler handler);
 void AddInlineParser(PrimaryParserData& data, InlineParserData parser);
-ProcessStats Parse(PrimaryParserData& data, int& argc, char** argv);
+void Parse(PrimaryParserData& data, int& argc, char** argv);
 
 }  // namespace kcli::detail

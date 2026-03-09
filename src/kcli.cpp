@@ -6,20 +6,15 @@
 
 namespace kcli {
 
-CliError::CliError(std::string option, std::string message, ProcessStats stats)
+CliError::CliError(std::string option, std::string message)
     : std::runtime_error(message.empty() ? "kcli parse failed" : message),
-      option_(std::move(option)),
-      stats_(stats) {
+      option_(std::move(option)) {
 }
 
 CliError::~CliError() = default;
 
 std::string_view CliError::option() const noexcept {
     return option_;
-}
-
-const ProcessStats& CliError::stats() const noexcept {
-    return stats_;
 }
 
 InlineParser::InlineParser(std::string_view root)
@@ -103,8 +98,8 @@ void PrimaryParser::addInlineParser(InlineParser parser) {
     detail::AddInlineParser(*data_, detail::CloneInlineParserData(*parser.data_));
 }
 
-ProcessStats PrimaryParser::parse(int& argc, char** argv) {
-    return detail::Parse(*data_, argc, argv);
+void PrimaryParser::parse(int& argc, char** argv) {
+    detail::Parse(*data_, argc, argv);
 }
 
 }  // namespace kcli
