@@ -26,7 +26,7 @@ void handleArgs(const kcli::HandlerContext&) {
 } // namespace
 
 int main(int argc, char** argv) {
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     kcli::InlineParser alphaParser = kcli::demo::alpha::GetInlineParser();
     kcli::InlineParser betaParser = kcli::demo::beta::GetInlineParser();
     kcli::InlineParser gammaParser = kcli::demo::gamma::GetInlineParser();

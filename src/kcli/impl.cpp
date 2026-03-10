@@ -9,7 +9,7 @@ namespace {
 
 using kcli::detail::CommandBinding;
 using kcli::detail::InlineParserData;
-using kcli::detail::PrimaryParserData;
+using kcli::detail::ParserData;
 
 CommandBinding MakeFlagBinding(kcli::FlagHandler handler, std::string_view description) {
     if (!handler) {
@@ -112,11 +112,11 @@ void SetInlineOptionalValueHandler(InlineParserData& data,
         data.commands, command, MakeValueBinding(std::move(handler), description, ValueArity::Optional));
 }
 
-void SetAlias(PrimaryParserData& data, std::string_view alias, std::string_view target) {
+void SetAlias(ParserData& data, std::string_view alias, std::string_view target) {
     SetAlias(data, alias, target, {});
 }
 
-void SetAlias(PrimaryParserData& data,
+void SetAlias(ParserData& data,
               std::string_view alias,
               std::string_view target,
               std::initializer_list<std::string_view> preset_tokens) {
@@ -143,7 +143,7 @@ void SetAlias(PrimaryParserData& data,
     data.aliases.push_back(std::move(normalized_binding));
 }
 
-void SetPrimaryHandler(PrimaryParserData& data,
+void SetPrimaryHandler(ParserData& data,
                        std::string_view option,
                        FlagHandler handler,
                        std::string_view description) {
@@ -151,7 +151,7 @@ void SetPrimaryHandler(PrimaryParserData& data,
     UpsertCommand(data.commands, command, MakeFlagBinding(std::move(handler), description));
 }
 
-void SetPrimaryHandler(PrimaryParserData& data,
+void SetPrimaryHandler(ParserData& data,
                        std::string_view option,
                        ValueHandler handler,
                        std::string_view description) {
@@ -160,7 +160,7 @@ void SetPrimaryHandler(PrimaryParserData& data,
         data.commands, command, MakeValueBinding(std::move(handler), description, ValueArity::Required));
 }
 
-void SetPrimaryOptionalValueHandler(PrimaryParserData& data,
+void SetPrimaryOptionalValueHandler(ParserData& data,
                                     std::string_view option,
                                     ValueHandler handler,
                                     std::string_view description) {
@@ -169,14 +169,14 @@ void SetPrimaryOptionalValueHandler(PrimaryParserData& data,
         data.commands, command, MakeValueBinding(std::move(handler), description, ValueArity::Optional));
 }
 
-void SetPositionalHandler(PrimaryParserData& data, PositionalHandler handler) {
+void SetPositionalHandler(ParserData& data, PositionalHandler handler) {
     if (!handler) {
         throw std::invalid_argument("kcli positional handler must not be empty");
     }
     data.positional_handler = std::move(handler);
 }
 
-void AddInlineParser(PrimaryParserData& data, InlineParserData parser) {
+void AddInlineParser(ParserData& data, InlineParserData parser) {
     for (const InlineParserData& existing : data.inline_parsers) {
         if (existing.root_name != parser.root_name) {
             continue;

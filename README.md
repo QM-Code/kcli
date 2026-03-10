@@ -31,7 +31,7 @@ void handleProfile(const kcli::HandlerContext&, std::string_view) {
 }
 
 int main(int argc, char** argv) {
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     kcli::InlineParser build("--build");
 
     build.setHandler("-profile", handleProfile, "Set build profile.");

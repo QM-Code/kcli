@@ -7,7 +7,7 @@ This page summarizes the public types in
 
 | Type | Purpose |
 | --- | --- |
-| `kcli::PrimaryParser` | Owns aliases, top-level handlers, positional handling, and inline parser registration. |
+| `kcli::Parser` | Owns aliases, top-level handlers, positional handling, and inline parser registration. |
 | `kcli::InlineParser` | Defines one inline root namespace such as `--build` plus its `--build-*` handlers. |
 | `kcli::HandlerContext` | Metadata delivered to flag, value, and positional handlers. |
 | `kcli::CliError` | Exception used by `parseOrThrow()` for invalid CLI input and handler failures. |
@@ -76,7 +76,7 @@ Inline handler options may be written in either form:
 - short inline form: `-profile`
 - fully-qualified form: `--build-profile`
 
-## PrimaryParser
+## Parser
 
 ### Top-Level Handlers
 
@@ -151,7 +151,7 @@ Use the registration form that matches the CLI contract you want:
 
 ## API Notes
 
-- `PrimaryParser` is moveable and not copyable.
+- `Parser` is moveable and not copyable.
 - `InlineParser` is copyable and moveable.
 - The public header is intended to be the source-of-truth contract for library
   consumers.

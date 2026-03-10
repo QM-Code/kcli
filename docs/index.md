@@ -18,7 +18,7 @@ It is intentionally opinionated about normal CLI behavior:
 ## Typical Flow
 
 ```cpp
-kcli::PrimaryParser parser;
+kcli::Parser parser;
 kcli::InlineParser build("--build");
 
 build.setHandler("-profile", handleProfile, "Set build profile.");
@@ -32,7 +32,7 @@ parser.parseOrExit(argc, argv);
 
 ## Core Concepts
 
-`PrimaryParser`
+`Parser`
 
 - Owns top-level handlers, aliases, inline parser registrations, and the single
   parse pass.

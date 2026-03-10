@@ -54,7 +54,7 @@ private:
 
 namespace detail {
 struct InlineParserData;
-struct PrimaryParserData;
+struct ParserData;
 }  // namespace detail
 
 class InlineParser {
@@ -103,18 +103,18 @@ public:
 private:
     std::unique_ptr<detail::InlineParserData> data_;
 
-    friend class PrimaryParser;
+    friend class Parser;
 };
 
-class PrimaryParser {
+class Parser {
 public:
-    PrimaryParser();
+    Parser();
 
-    PrimaryParser(const PrimaryParser&) = delete;
-    PrimaryParser& operator=(const PrimaryParser&) = delete;
-    PrimaryParser(PrimaryParser&& other) noexcept;
-    PrimaryParser& operator=(PrimaryParser&& other) noexcept;
-    ~PrimaryParser();
+    Parser(const Parser&) = delete;
+    Parser& operator=(const Parser&) = delete;
+    Parser(Parser&& other) noexcept;
+    Parser& operator=(Parser&& other) noexcept;
+    ~Parser();
 
     // Maps a single-dash alias such as "-v" to a long-form option such as
     // "--verbose". Preset tokens, when provided, are prepended to the
@@ -159,7 +159,7 @@ public:
     void parseOrThrow(int argc, char* const* argv);
 
 private:
-    std::unique_ptr<detail::PrimaryParserData> data_;
+    std::unique_ptr<detail::ParserData> data_;
 };
 
 }  // namespace kcli

@@ -106,53 +106,53 @@ void InlineParser::setOptionalValueHandler(std::string_view option,
     detail::SetInlineOptionalValueHandler(*data_, option, std::move(handler), description);
 }
 
-PrimaryParser::PrimaryParser()
-    : data_(std::make_unique<detail::PrimaryParserData>()) {
+Parser::Parser()
+    : data_(std::make_unique<detail::ParserData>()) {
 }
 
-PrimaryParser::PrimaryParser(PrimaryParser&& other) noexcept = default;
+Parser::Parser(Parser&& other) noexcept = default;
 
-PrimaryParser& PrimaryParser::operator=(PrimaryParser&& other) noexcept = default;
+Parser& Parser::operator=(Parser&& other) noexcept = default;
 
-PrimaryParser::~PrimaryParser() = default;
+Parser::~Parser() = default;
 
-void PrimaryParser::addAlias(std::string_view alias, std::string_view target) {
+void Parser::addAlias(std::string_view alias, std::string_view target) {
     detail::SetAlias(*data_, alias, target);
 }
 
-void PrimaryParser::addAlias(std::string_view alias,
-                             std::string_view target,
-                             std::initializer_list<std::string_view> preset_tokens) {
+void Parser::addAlias(std::string_view alias,
+                      std::string_view target,
+                      std::initializer_list<std::string_view> preset_tokens) {
     detail::SetAlias(*data_, alias, target, preset_tokens);
 }
 
-void PrimaryParser::setHandler(std::string_view option,
-                               FlagHandler handler,
-                               std::string_view description) {
+void Parser::setHandler(std::string_view option,
+                        FlagHandler handler,
+                        std::string_view description) {
     detail::SetPrimaryHandler(*data_, option, std::move(handler), description);
 }
 
-void PrimaryParser::setHandler(std::string_view option,
-                               ValueHandler handler,
-                               std::string_view description) {
+void Parser::setHandler(std::string_view option,
+                        ValueHandler handler,
+                        std::string_view description) {
     detail::SetPrimaryHandler(*data_, option, std::move(handler), description);
 }
 
-void PrimaryParser::setOptionalValueHandler(std::string_view option,
-                                            ValueHandler handler,
-                                            std::string_view description) {
+void Parser::setOptionalValueHandler(std::string_view option,
+                                     ValueHandler handler,
+                                     std::string_view description) {
     detail::SetPrimaryOptionalValueHandler(*data_, option, std::move(handler), description);
 }
 
-void PrimaryParser::setPositionalHandler(PositionalHandler handler) {
+void Parser::setPositionalHandler(PositionalHandler handler) {
     detail::SetPositionalHandler(*data_, std::move(handler));
 }
 
-void PrimaryParser::addInlineParser(InlineParser parser) {
+void Parser::addInlineParser(InlineParser parser) {
     detail::AddInlineParser(*data_, detail::CloneInlineParserData(*parser.data_));
 }
 
-void PrimaryParser::parseOrExit(int argc, char* const* argv) {
+void Parser::parseOrExit(int argc, char* const* argv) {
     try {
         parseOrThrow(argc, argv);
     } catch (const CliError& ex) {
@@ -160,7 +160,7 @@ void PrimaryParser::parseOrExit(int argc, char* const* argv) {
     }
 }
 
-void PrimaryParser::parseOrThrow(int argc, char* const* argv) {
+void Parser::parseOrThrow(int argc, char* const* argv) {
     detail::Parse(*data_, argc, argv);
 }
 

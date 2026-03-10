@@ -196,7 +196,7 @@ private:
 };
 
 template <typename ConfigureFn>
-void AddInlineParser(kcli::PrimaryParser& parser,
+void AddInlineParser(kcli::Parser& parser,
                      std::string_view root,
                      ConfigureFn&& configure) {
     kcli::InlineParser inline_parser(root);
@@ -234,9 +234,9 @@ CapturedCliError ExpectCliError(TestContext& t,
     return {};
 }
 
-void CasePrimaryParserEmptyParseSucceeds(TestContext& t) {
+void CaseParserEmptyParseSucceeds(TestContext& t) {
     ArgvFixture args{"prog"};
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
 
     parser.parseOrExit(args.argc, args.data());
     t.ExpectEq(args.CurrentTokens(),
@@ -261,7 +261,7 @@ void CaseEndUserKnownOptionsWithUnknownOptionError(TestContext& t) {
     std::string output;
     std::vector<std::string> positionals;
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     parser.setHandler("verbose",
                       [&](const kcli::HandlerContext&) {
                           verbose = true;
@@ -303,7 +303,7 @@ void CaseAddAliasRewritesTokens(TestContext& t) {
 
     bool verbose = false;
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     parser.addAlias("-v", "--verbose");
     parser.setHandler("--verbose",
                       [&](const kcli::HandlerContext& context) {
@@ -329,7 +329,7 @@ void CaseAddAliasPresetTokensAppendToValueHandlers(TestContext& t) {
     std::string value;
     std::vector<std::string> value_tokens;
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     parser.addAlias("-c", "--config-load", {"user-file"});
     parser.setHandler("--config-load",
                       [&](const kcli::HandlerContext& context, std::string_view captured) {
@@ -361,7 +361,7 @@ void CaseAddAliasPresetTokensSatisfyRequiredValues(TestContext& t) {
     std::string value;
     std::vector<std::string> value_tokens;
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     parser.addAlias("-p", "--profile", {"release"});
     parser.setHandler("--profile",
                       [&](const kcli::HandlerContext& context, std::string_view captured) {
@@ -393,7 +393,7 @@ void CaseAddAliasPresetTokensApplyToInlineRootValues(TestContext& t) {
     std::string value;
     std::vector<std::string> value_tokens;
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     kcli::InlineParser config("--config");
     config.setRootValueHandler(
         [&](const kcli::HandlerContext& context, std::string_view captured) {
@@ -429,7 +429,7 @@ void CaseAddAliasRewritesAfterDoubleDash(TestContext& t) {
 
     bool verbose = false;
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     parser.addAlias("-v", "--verbose");
     parser.setHandler("--verbose",
                       [&](const kcli::HandlerContext&) {
@@ -451,13 +451,13 @@ void CaseAddAliasRewritesAfterDoubleDash(TestContext& t) {
                "parseOrThrow() should leave argv unchanged even when alias expansion is involved");
 }
 
-void CasePrimaryParserCanBeReusedAcrossParses(TestContext& t) {
+void CaseParserCanBeReusedAcrossParses(TestContext& t) {
     ArgvFixture first_args{"prog", "-v"};
     ArgvFixture second_args{"prog", "-v"};
 
     int calls = 0;
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     parser.addAlias("-v", "--verbose");
     parser.setHandler("--verbose",
                       [&](const kcli::HandlerContext&) {
@@ -483,7 +483,7 @@ void CaseAliasDoesNotRewriteRequiredValueTokens(TestContext& t) {
     bool verbose = false;
     std::string output;
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     parser.addAlias("-v", "--verbose");
     parser.setHandler("--verbose",
                       [&](const kcli::HandlerContext&) {
@@ -506,7 +506,7 @@ void CaseAliasDoesNotRewriteRequiredValueTokens(TestContext& t) {
 }
 
 void CaseAddAliasRejectsInvalidAlias(TestContext& t) {
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
 
     t.ExpectThrowContains<std::invalid_argument>(
         [&] {
@@ -517,7 +517,7 @@ void CaseAddAliasRejectsInvalidAlias(TestContext& t) {
 }
 
 void CaseAddAliasRejectsInvalidTarget(TestContext& t) {
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
 
     t.ExpectThrowContains<std::invalid_argument>(
         [&] {
@@ -528,7 +528,7 @@ void CaseAddAliasRejectsInvalidTarget(TestContext& t) {
 }
 
 void CaseAddAliasRejectsSingleDashTarget(TestContext& t) {
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
 
     t.ExpectThrowContains<std::invalid_argument>(
         [&] {
@@ -543,7 +543,7 @@ void CaseAddAliasRejectsPresetValuesForFlagTargets(TestContext& t) {
 
     bool verbose = false;
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     parser.addAlias("-v", "--verbose", {"unexpected"});
     parser.setHandler("--verbose",
                       [&](const kcli::HandlerContext&) {
@@ -566,7 +566,7 @@ void CaseAddAliasRejectsPresetValuesForFlagTargets(TestContext& t) {
 }
 
 void CasePositionalHandlerRequiresNonEmpty(TestContext& t) {
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     t.ExpectThrowContains<std::invalid_argument>(
         [&] {
             parser.setPositionalHandler(kcli::PositionalHandler{});
@@ -576,7 +576,7 @@ void CasePositionalHandlerRequiresNonEmpty(TestContext& t) {
 }
 
 void CaseEndUserHandlerNormalizationRejectsSingleDash(TestContext& t) {
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
 
     t.ExpectThrowContains<std::invalid_argument>(
         [&] {
@@ -595,7 +595,7 @@ void CaseInlineHandlerNormalizationAcceptsShortAndFullForms(TestContext& t) {
     bool flag = false;
     std::string value;
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     AddInlineParser(
         parser,
         "build",
@@ -637,7 +637,7 @@ void CaseInlineHandlerNormalizationRejectsWrongRoot(TestContext& t) {
 void CaseInlineBareRootPrintsHelp(TestContext& t) {
     ArgvFixture args{"prog", "--build"};
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     AddInlineParser(
         parser,
         "build",
@@ -673,7 +673,7 @@ void CaseInlineBareRootPrintsHelp(TestContext& t) {
 void CaseInlineRootValueHandlerHelpRowPrints(TestContext& t) {
     ArgvFixture args{"prog", "--build"};
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     AddInlineParser(
         parser,
         "build",
@@ -708,7 +708,7 @@ void CaseInlineRootValueHandlerJoinsTokens(TestContext& t) {
     std::vector<std::string> received_tokens;
     std::string received_option;
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     AddInlineParser(
         parser,
         "build",
@@ -735,7 +735,7 @@ void CaseInlineRootValueHandlerJoinsTokens(TestContext& t) {
 void CaseInlineMissingRootValueHandlerErrors(TestContext& t) {
     ArgvFixture args{"prog", "--build", "fast"};
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     parser.addInlineParser(kcli::InlineParser("--build"));
     const CapturedCliError error = ExpectCliError(
         t,
@@ -760,7 +760,7 @@ void CaseOptionalValueHandlerAllowsMissingValue(TestContext& t) {
     std::string received_value;
     std::vector<std::string> received_tokens;
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     AddInlineParser(
         parser,
         "build",
@@ -793,7 +793,7 @@ void CaseOptionalValueHandlerAcceptsExplicitEmptyValue(TestContext& t) {
     std::string received_value;
     std::vector<std::string> received_tokens;
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     AddInlineParser(
         parser,
         "build",
@@ -825,7 +825,7 @@ void CaseFlagHandlerDoesNotConsumeFollowingTokens(TestContext& t) {
     bool called = false;
     std::vector<std::string> positionals;
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     AddInlineParser(
         parser,
         "build",
@@ -854,7 +854,7 @@ void CaseFlagHandlerDoesNotConsumeFollowingTokens(TestContext& t) {
 void CaseRequiredValueHandlerRejectsMissingValue(TestContext& t) {
     ArgvFixture args{"prog", "--build-value"};
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     AddInlineParser(
         parser,
         "build",
@@ -888,7 +888,7 @@ void CaseRequiredValueHandlerAcceptsDashPrefixedFirstValue(TestContext& t) {
 
     std::string value;
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     AddInlineParser(
         parser,
         "build",
@@ -914,7 +914,7 @@ void CaseRequiredValueHandlerPreservesShellWhitespace(TestContext& t) {
     std::string received_value;
     std::vector<std::string> received_tokens;
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     parser.setHandler("--name",
                       [&](const kcli::HandlerContext& context, std::string_view value) {
                           received_value = std::string(value);
@@ -941,7 +941,7 @@ void CaseRequiredValueHandlerAcceptsExplicitEmptyValue(TestContext& t) {
     std::string received_value;
     std::vector<std::string> received_tokens;
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     parser.setHandler("--name",
                       [&](const kcli::HandlerContext& context, std::string_view value) {
                           received_value = std::string(value);
@@ -967,7 +967,7 @@ void CasePositionalHandlerPreservesExplicitEmptyTokens(TestContext& t) {
 
     std::vector<std::string> positionals;
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     parser.setPositionalHandler(
         [&](const kcli::HandlerContext& context) {
             positionals = CopyTokens(context.value_tokens);
@@ -986,7 +986,7 @@ void CasePositionalHandlerPreservesExplicitEmptyTokens(TestContext& t) {
 void CaseUnknownInlineOptionErrors(TestContext& t) {
     ArgvFixture args{"prog", "--build-unknown"};
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     parser.addInlineParser(kcli::InlineParser("--build"));
 
     const CapturedCliError error = ExpectCliError(
@@ -1010,7 +1010,7 @@ void CaseUnknownInlineOptionErrors(TestContext& t) {
 void CaseUnknownOptionReportsDoubleDash(TestContext& t) {
     ArgvFixture args{"prog", "--"};
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     const CapturedCliError error = ExpectCliError(
         t,
         [&] {
@@ -1026,7 +1026,7 @@ void CaseUnknownOptionReportsDoubleDash(TestContext& t) {
 void CaseUnknownOptionThrowsCliError(TestContext& t) {
     ArgvFixture args{"prog", "--bogus"};
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
 
     const CapturedCliError error = ExpectCliError(
         t,
@@ -1044,7 +1044,7 @@ void CaseUnknownOptionThrowsCliError(TestContext& t) {
 void CaseOptionHandlerExceptionThrowsCliError(TestContext& t) {
     ArgvFixture args{"prog", "--verbose"};
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     parser.setHandler("--verbose",
                       [&](const kcli::HandlerContext&) {
                           throw std::runtime_error("option boom");
@@ -1066,7 +1066,7 @@ void CaseOptionHandlerExceptionThrowsCliError(TestContext& t) {
 void CasePositionalHandlerExceptionThrowsCliError(TestContext& t) {
     ArgvFixture args{"prog", "tail"};
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     parser.setPositionalHandler(
         [&](const kcli::HandlerContext&) {
             throw std::runtime_error("positional boom");
@@ -1090,7 +1090,7 @@ void CaseSinglePassProcessingConsumesInlineEndUserAndPositionals(TestContext& t)
     std::string output;
     std::vector<std::string> positionals;
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     AddInlineParser(
         parser,
         "alpha",
@@ -1125,7 +1125,7 @@ void CaseInlineParserRootOverrideApplies(TestContext& t) {
 
     std::string tag;
 
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     kcli::InlineParser gamma("--gamma");
     gamma.setHandler("-tag",
                      [&](const kcli::HandlerContext&, std::string_view value) {
@@ -1144,7 +1144,7 @@ void CaseInlineParserRootOverrideApplies(TestContext& t) {
 }
 
 void CaseDuplicateInlineRootRejected(TestContext& t) {
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     parser.addInlineParser(kcli::InlineParser("--build"));
 
     t.ExpectThrowContains<std::invalid_argument>(
@@ -1158,7 +1158,7 @@ void CaseDuplicateInlineRootRejected(TestContext& t) {
 using CaseFunction = void (*)(TestContext&);
 
 const std::pair<std::string_view, CaseFunction> kCases[] = {
-    {"primary_parser_empty_parse_succeeds", CasePrimaryParserEmptyParseSucceeds},
+    {"parser_empty_parse_succeeds", CaseParserEmptyParseSucceeds},
     {"inline_parser_rejects_invalid_root", CaseInlineParserRejectsInvalidRoot},
     {"end_user_known_options_with_unknown_option_error",
      CaseEndUserKnownOptionsWithUnknownOptionError},
@@ -1170,7 +1170,7 @@ const std::pair<std::string_view, CaseFunction> kCases[] = {
     {"add_alias_preset_tokens_apply_to_inline_root_values",
      CaseAddAliasPresetTokensApplyToInlineRootValues},
     {"add_alias_rewrites_after_double_dash", CaseAddAliasRewritesAfterDoubleDash},
-    {"primary_parser_can_be_reused_across_parses", CasePrimaryParserCanBeReusedAcrossParses},
+    {"parser_can_be_reused_across_parses", CaseParserCanBeReusedAcrossParses},
     {"alias_does_not_rewrite_required_value_tokens", CaseAliasDoesNotRewriteRequiredValueTokens},
     {"add_alias_rejects_invalid_alias", CaseAddAliasRejectsInvalidAlias},
     {"add_alias_rejects_single_dash_target", CaseAddAliasRejectsSingleDashTarget},

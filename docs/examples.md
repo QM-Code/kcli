@@ -18,7 +18,7 @@ void handleVerbose(const kcli::HandlerContext&) {
 }
 
 int main(int argc, char** argv) {
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
 
     parser.addAlias("-v", "--verbose");
     parser.setHandler("--verbose", handleVerbose, "Enable verbose logging.");
@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
 ## Inline Root With Subcommands-Like Options
 
 ```cpp
-kcli::PrimaryParser parser;
+kcli::Parser parser;
 kcli::InlineParser build("--build");
 
 build.setHandler("-profile",
@@ -78,7 +78,7 @@ Behavior:
 ## Alias Preset Tokens
 
 ```cpp
-kcli::PrimaryParser parser;
+kcli::Parser parser;
 
 parser.addAlias("-c", "--config-load", {"user-file"});
 parser.setHandler("--config-load", handleConfigLoad, "Load config.");

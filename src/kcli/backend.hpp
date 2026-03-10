@@ -35,7 +35,7 @@ struct InlineParserData {
     std::vector<std::pair<std::string, CommandBinding>> commands{};
 };
 
-struct PrimaryParserData {
+struct ParserData {
     PositionalHandler positional_handler{};
     std::vector<AliasBinding> aliases{};
     std::vector<std::pair<std::string, CommandBinding>> commands{};
@@ -63,25 +63,25 @@ void SetInlineOptionalValueHandler(InlineParserData& data,
                                    ValueHandler handler,
                                    std::string_view description);
 
-void SetAlias(PrimaryParserData& data, std::string_view alias, std::string_view target);
-void SetAlias(PrimaryParserData& data,
+void SetAlias(ParserData& data, std::string_view alias, std::string_view target);
+void SetAlias(ParserData& data,
               std::string_view alias,
               std::string_view target,
               std::initializer_list<std::string_view> preset_tokens);
-void SetPrimaryHandler(PrimaryParserData& data,
+void SetPrimaryHandler(ParserData& data,
                        std::string_view option,
                        FlagHandler handler,
                        std::string_view description);
-void SetPrimaryHandler(PrimaryParserData& data,
+void SetPrimaryHandler(ParserData& data,
                        std::string_view option,
                        ValueHandler handler,
                        std::string_view description);
-void SetPrimaryOptionalValueHandler(PrimaryParserData& data,
+void SetPrimaryOptionalValueHandler(ParserData& data,
                                     std::string_view option,
                                     ValueHandler handler,
                                     std::string_view description);
-void SetPositionalHandler(PrimaryParserData& data, PositionalHandler handler);
-void AddInlineParser(PrimaryParserData& data, InlineParserData parser);
-void Parse(PrimaryParserData& data, int argc, char* const* argv);
+void SetPositionalHandler(ParserData& data, PositionalHandler handler);
+void AddInlineParser(ParserData& data, InlineParserData parser);
+void Parse(ParserData& data, int argc, char* const* argv);
 
 }  // namespace kcli::detail

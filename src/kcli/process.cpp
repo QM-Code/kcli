@@ -16,7 +16,7 @@ using kcli::detail::AliasBinding;
 using kcli::detail::CommandBinding;
 using kcli::detail::InlineParserData;
 using kcli::detail::ParseOutcome;
-using kcli::detail::PrimaryParserData;
+using kcli::detail::ParserData;
 
 enum class InvocationKind {
     Flag,
@@ -194,7 +194,7 @@ const CommandBinding* FindCommand(const std::vector<std::pair<std::string, Comma
     return nullptr;
 }
 
-const AliasBinding* FindAliasBinding(const PrimaryParserData& data, std::string_view token) {
+const AliasBinding* FindAliasBinding(const ParserData& data, std::string_view token) {
     for (const AliasBinding& alias : data.aliases) {
         if (token == alias.alias) {
             return &alias;
@@ -254,7 +254,7 @@ std::vector<std::pair<std::string, std::string>> BuildHelpRows(const InlineParse
     return rows;
 }
 
-InlineTokenMatch MatchInlineToken(const PrimaryParserData& data, std::string_view arg) {
+InlineTokenMatch MatchInlineToken(const ParserData& data, std::string_view arg) {
     for (const InlineParserData& parser : data.inline_parsers) {
         const std::string root_option = "--" + parser.root_name;
         if (arg == root_option) {
@@ -328,7 +328,7 @@ bool ScheduleInvocation(const CommandBinding& binding,
     return true;
 }
 
-void SchedulePositionals(const PrimaryParserData& data,
+void SchedulePositionals(const ParserData& data,
                         const std::vector<std::string>& tokens,
                         std::vector<bool>& consumed,
                         std::vector<Invocation>& invocations) {
@@ -419,7 +419,7 @@ void ExecuteInvocations(const std::vector<Invocation>& invocations,
 
 namespace kcli::detail {
 
-void Parse(PrimaryParserData& data, int argc, char* const* argv) {
+void Parse(ParserData& data, int argc, char* const* argv) {
     ParseOutcome result{};
     if (argc > 0 && argv == nullptr) {
         result = MakeError("", "kcli received invalid argv (argc > 0 but argv is null)");

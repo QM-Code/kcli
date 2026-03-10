@@ -24,7 +24,7 @@ void handleOutput(const kcli::HandlerContext&, std::string_view) {
 
 int main(int argc, char** argv) {
     const std::string exe_name = ExecutableName((argc > 0) ? argv[0] : nullptr);
-    kcli::PrimaryParser parser;
+    kcli::Parser parser;
     kcli::InlineParser alphaParser = kcli::demo::alpha::GetInlineParser();
 
     parser.addInlineParser(alphaParser);
