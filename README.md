@@ -1,6 +1,66 @@
 # Karma CLI Parsing SDK
 
-Standalone CLI parsing SDK used by `ktrace` and `kconfig`.
+`kcli` is a small C++20 SDK for building structured command-line interfaces.
+It is used by `ktrace` and `kconfig`, and is designed around two common CLI
+shapes:
+
+- Top-level options such as `--verbose` and `--output`.
+- Inline roots such as `--trace-*`, `--config-*`, and `--build-*`.
+
+The library gives you two explicit entrypoints:
+
+- `parseOrExit(argc, argv)` for normal executable startup.
+- `parseOrThrow(argc, argv)` when the caller wants to intercept `kcli::CliError`.
+
+## Documentation
+
+- [Overview and quick start](docs/index.md)
+- [API guide](docs/api.md)
+- [Parsing behavior](docs/behavior.md)
+- [Examples](docs/examples.md)
+
+## Quick Start
+
+```cpp
+#include <kcli.hpp>
+
+void handleVerbose(const kcli::HandlerContext&) {
+}
+
+void handleProfile(const kcli::HandlerContext&, std::string_view) {
+}
+
+int main(int argc, char** argv) {
+    kcli::PrimaryParser parser;
+    kcli::InlineParser build("--build");
+
+    build.setHandler("-profile",
+                     handleProfile,
+                     "Set build profile.",
+                     kcli::ValueMode::Required);
+
+    parser.addInlineParser(build);
+    parser.addAlias("-v", "--verbose");
+    parser.setHandler("--verbose", handleVerbose, "Enable verbose logging.");
+
+    parser.parseOrExit(argc, argv);
+    return 0;
+}
+```
+
+## Behavior Highlights
+
+- The full command line is validated before any registered handler runs.
+- `parseOrExit()` preserves the caller's `argv`, reports invalid CLI input to
+  `stderr`, and exits with code `2`.
+- `parseOrThrow()` preserves the caller's `argv` and throws `kcli::CliError`.
+- Bare inline roots such as `--build` print inline help unless a root value is
+  provided.
+- Required values may consume a first token that begins with `-`.
+- Literal `--` is rejected as an unknown option; it is not treated as an option
+  terminator.
+
+For the full parsing rules, see [docs/behavior.md](docs/behavior.md).
 
 ## Build SDK
 
@@ -9,28 +69,26 @@ Standalone CLI parsing SDK used by `ktrace` and `kconfig`.
 ```
 
 SDK output:
+
 - `build/latest/sdk/include`
 - `build/latest/sdk/lib`
 - `build/latest/sdk/lib/cmake/KcliSDK`
 
-## Build and Test Demos
+## Build And Run Demos
 
 ```bash
-# Builds SDK plus kbuild.json "build.defaults.demos".
+# Builds the SDK plus demos listed in kbuild.json build.defaults.demos.
 ./kbuild.py --build-latest
 
-# Explicit demo-only run (uses build.demos when no args are provided).
+# Explicit demo-only run (uses kbuild.json build.demos when no args are passed).
 ./kbuild.py --build-demos
-
-./demo/exe/core/build/latest/test
 ```
 
-Demos:
-- Bootstrap compile/link check: `demo/bootstrap/`
-- SDKs: `demo/sdk/{alpha,beta,gamma}`
-- Executables: `demo/exe/{core,omega}`
+Demo directories:
 
-Demo builds are orchestrated by the root `kbuild.py`.
+- Bootstrap compile/link check: `demo/bootstrap/`
+- SDK demos: `demo/sdk/{alpha,beta,gamma}`
+- Executable demos: `demo/exe/{core,omega}`
 
 Useful demo commands:
 
@@ -41,53 +99,8 @@ Useful demo commands:
 ./demo/exe/core/build/latest/test --output stdout
 ./demo/exe/omega/build/latest/test --beta-workers 8
 ./demo/exe/omega/build/latest/test --newgamma-tag "prod"
-./demo/exe/omega/build/latest/test --alpha-d
+./demo/exe/omega/build/latest/test --build
 ```
-
-## Parser Objects
-
-- `PrimaryParser`
-  Owns aliases, end-user handlers, inline parser registrations, and the single CLI parse pass.
-- `InlineParser`
-  Defines one inline root namespace such as `--alpha` or `--build` plus its `--<root>-*` handlers.
-
-Typical flow:
-
-```cpp
-kcli::PrimaryParser parser;
-kcli::InlineParser build("--build");
-
-build.setHandler("-profile", handleProfile, "Set build profile.", kcli::ValueMode::Required);
-parser.addInlineParser(build);
-
-parser.addAlias("-v", "--verbose");
-parser.addAlias("-c", "--config-load", {"user-file"});
-parser.setHandler("--verbose", handleVerbose, "Enable verbose logging.");
-
-parser.parseOrExit(argc, argv);
-```
-
-Inline mode behavior:
-- `--<root>` always prints available `--<root>-*` options.
-- `--<root> value [value...]` is accepted only when a root value handler is registered.
-- Root value handlers can also advertise a help row such as `--build <selector>`.
-- Required option values consume the next CLI token, even when it starts with `-`.
-- Optional values only start consuming when the next token looks like a value.
-- `HandlerContext::value_tokens` exposes effective value tokens after alias expansion; shell tokens are preserved verbatim and alias preset tokens are prepended in order.
-- For optional-value handlers, omitted values yield an empty `value_tokens`; explicit `""` yields one empty token.
-- Unknown option-like tokens fail the parse.
-- Literal `--` is rejected as an unknown option; it is not treated as an option terminator.
-- Aliases are defined on the primary parser using single-dash to double-dash form; consumed value tokens are not alias-expanded.
-- Aliases can also prepopulate value tokens, so `-c file.json` can behave like `--config-load user-file file.json`.
-- Handlers run only after the full command line validates.
-- `parseOrExit(argc, argv)` reads the caller's argument vector without rewriting or compacting it.
-- `parseOrExit()` reports invalid CLI input to `stderr` as `[error] [cli] ...`, colors `error` red and `cli` blue on terminals, and exits with code `2`.
-- `parseOrThrow()` is available when a caller needs to intercept `kcli::CliError` directly.
-
-Root token rules:
-- Roots can be configured as `"trace"` or `"--trace"`.
-- Inline roots only match `--<root>` and `--<root>-*`.
-- Roots beginning with `-` are rejected.
 
 ## Install
 
@@ -97,6 +110,13 @@ Consumer CMake:
 find_package(KcliSDK CONFIG REQUIRED)
 target_link_libraries(main PRIVATE kcli::sdk)
 ```
+
+## Repository Layout
+
+- Public API: `include/kcli.hpp`
+- Library implementation: `src/`
+- API behavior coverage: `cmake/tests/kcli_api_cases.cpp`
+- Integration demos: `demo/`
 
 ## Coding Agents
 
