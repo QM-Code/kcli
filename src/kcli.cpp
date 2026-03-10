@@ -96,9 +96,14 @@ void InlineParser::setHandler(std::string_view option,
 
 void InlineParser::setHandler(std::string_view option,
                               ValueHandler handler,
-                              std::string_view description,
-                              ValueMode mode) {
-    detail::SetInlineHandler(*data_, option, std::move(handler), description, mode);
+                              std::string_view description) {
+    detail::SetInlineHandler(*data_, option, std::move(handler), description);
+}
+
+void InlineParser::setOptionalValueHandler(std::string_view option,
+                                           ValueHandler handler,
+                                           std::string_view description) {
+    detail::SetInlineOptionalValueHandler(*data_, option, std::move(handler), description);
 }
 
 PrimaryParser::PrimaryParser()
@@ -129,9 +134,14 @@ void PrimaryParser::setHandler(std::string_view option,
 
 void PrimaryParser::setHandler(std::string_view option,
                                ValueHandler handler,
-                               std::string_view description,
-                               ValueMode mode) {
-    detail::SetPrimaryHandler(*data_, option, std::move(handler), description, mode);
+                               std::string_view description) {
+    detail::SetPrimaryHandler(*data_, option, std::move(handler), description);
+}
+
+void PrimaryParser::setOptionalValueHandler(std::string_view option,
+                                            ValueHandler handler,
+                                            std::string_view description) {
+    detail::SetPrimaryOptionalValueHandler(*data_, option, std::move(handler), description);
 }
 
 void PrimaryParser::setPositionalHandler(PositionalHandler handler) {

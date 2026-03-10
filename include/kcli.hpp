@@ -10,13 +10,6 @@
 
 namespace kcli {
 
-// Controls whether a value handler consumes trailing CLI tokens.
-enum class ValueMode {
-    None,      // The handler runs without consuming any value tokens.
-    Required,  // At least one value token is required.
-    Optional,  // Value tokens are optional.
-};
-
 // Metadata describing one scheduled handler invocation.
 struct HandlerContext {
 
@@ -38,13 +31,6 @@ struct HandlerContext {
     // For optional-value handlers, an omitted value leaves this empty;
     // an explicit empty-string argument contributes one empty token.
     std::vector<std::string_view> value_tokens{};
-
-    // True when the invocation originated from addAlias().
-    bool from_alias = false;
-
-    // argv index of the triggering option token, or the first positional token.
-    // Remains -1 when no concrete token applies.
-    int option_index = -1;
 };
 
 using FlagHandler = std::function<void(const HandlerContext&)>;
@@ -103,11 +89,16 @@ public:
                     std::string_view description);
 
     // Registers an inline value handler. The option may be provided as "-name"
-    // or as the fully-qualified "--<root>-name".
+    // or as the fully-qualified "--<root>-name". A value is required.
     void setHandler(std::string_view option,
                     ValueHandler handler,
-                    std::string_view description,
-                    ValueMode mode = ValueMode::Required);
+                    std::string_view description);
+
+    // Registers an inline value handler whose value is optional. The option may
+    // be provided as "-name" or as the fully-qualified "--<root>-name".
+    void setOptionalValueHandler(std::string_view option,
+                                 ValueHandler handler,
+                                 std::string_view description);
 
 private:
     std::unique_ptr<detail::InlineParserData> data_;
@@ -141,11 +132,16 @@ public:
                     std::string_view description);
 
     // Registers a top-level value handler. The option may be provided as
-    // "name" or "--name".
+    // "name" or "--name". A value is required.
     void setHandler(std::string_view option,
                     ValueHandler handler,
-                    std::string_view description,
-                    ValueMode mode = ValueMode::Required);
+                    std::string_view description);
+
+    // Registers a top-level value handler whose value is optional. The option
+    // may be provided as "name" or "--name".
+    void setOptionalValueHandler(std::string_view option,
+                                 ValueHandler handler,
+                                 std::string_view description);
 
     // Receives remaining non-option tokens after option parsing succeeds.
     void setPositionalHandler(PositionalHandler handler);

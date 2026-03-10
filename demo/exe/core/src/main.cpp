@@ -34,10 +34,7 @@ int main(int argc, char** argv) {
     parser.addAlias("-a", "--alpha-enable");
 
     parser.setHandler("--verbose", handleVerbose, "Enable verbose app logging.");
-    parser.setHandler("--output",
-                      handleOutput,
-                      "Set app output target.",
-                      kcli::ValueMode::Required);
+    parser.setHandler("--output", handleOutput, "Set app output target.");
     parser.parseOrExit(argc, argv);
 
     std::cout << "\nKCLI demo core compile/link/integration check passed\n\n";

@@ -21,10 +21,7 @@ It is intentionally opinionated about normal CLI behavior:
 kcli::PrimaryParser parser;
 kcli::InlineParser build("--build");
 
-build.setHandler("-profile",
-                 handleProfile,
-                 "Set build profile.",
-                 kcli::ValueMode::Required);
+build.setHandler("-profile", handleProfile, "Set build profile.");
 
 parser.addInlineParser(build);
 parser.addAlias("-v", "--verbose");

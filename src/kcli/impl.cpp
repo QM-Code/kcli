@@ -19,14 +19,13 @@ CommandBinding MakeFlagBinding(kcli::FlagHandler handler, std::string_view descr
     CommandBinding binding{};
     binding.expects_value = false;
     binding.flag_handler = std::move(handler);
-    binding.value_mode = kcli::ValueMode::None;
     binding.description = kcli::detail::NormalizeDescriptionOrThrow(description);
     return binding;
 }
 
 CommandBinding MakeValueBinding(kcli::ValueHandler handler,
                                 std::string_view description,
-                                kcli::ValueMode mode) {
+                                kcli::detail::ValueArity arity) {
     if (!handler) {
         throw std::invalid_argument("kcli value handler must not be empty");
     }
@@ -34,7 +33,7 @@ CommandBinding MakeValueBinding(kcli::ValueHandler handler,
     CommandBinding binding{};
     binding.expects_value = true;
     binding.value_handler = std::move(handler);
-    binding.value_mode = mode;
+    binding.value_arity = arity;
     binding.description = kcli::detail::NormalizeDescriptionOrThrow(description);
     return binding;
 }
@@ -98,10 +97,19 @@ void SetInlineHandler(InlineParserData& data,
 void SetInlineHandler(InlineParserData& data,
                       std::string_view option,
                       ValueHandler handler,
-                      std::string_view description,
-                      ValueMode mode) {
+                      std::string_view description) {
     const std::string command = NormalizeInlineHandlerOptionOrThrow(option, data.root_name);
-    UpsertCommand(data.commands, command, MakeValueBinding(std::move(handler), description, mode));
+    UpsertCommand(
+        data.commands, command, MakeValueBinding(std::move(handler), description, ValueArity::Required));
+}
+
+void SetInlineOptionalValueHandler(InlineParserData& data,
+                                   std::string_view option,
+                                   ValueHandler handler,
+                                   std::string_view description) {
+    const std::string command = NormalizeInlineHandlerOptionOrThrow(option, data.root_name);
+    UpsertCommand(
+        data.commands, command, MakeValueBinding(std::move(handler), description, ValueArity::Optional));
 }
 
 void SetAlias(PrimaryParserData& data, std::string_view alias, std::string_view target) {
@@ -146,10 +154,19 @@ void SetPrimaryHandler(PrimaryParserData& data,
 void SetPrimaryHandler(PrimaryParserData& data,
                        std::string_view option,
                        ValueHandler handler,
-                       std::string_view description,
-                       ValueMode mode) {
+                       std::string_view description) {
     const std::string command = NormalizePrimaryHandlerOptionOrThrow(option);
-    UpsertCommand(data.commands, command, MakeValueBinding(std::move(handler), description, mode));
+    UpsertCommand(
+        data.commands, command, MakeValueBinding(std::move(handler), description, ValueArity::Required));
+}
+
+void SetPrimaryOptionalValueHandler(PrimaryParserData& data,
+                                    std::string_view option,
+                                    ValueHandler handler,
+                                    std::string_view description) {
+    const std::string command = NormalizePrimaryHandlerOptionOrThrow(option);
+    UpsertCommand(
+        data.commands, command, MakeValueBinding(std::move(handler), description, ValueArity::Optional));
 }
 
 void SetPositionalHandler(PrimaryParserData& data, PositionalHandler handler) {

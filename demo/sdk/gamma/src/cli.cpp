@@ -44,14 +44,8 @@ namespace kcli::demo::gamma {
 
 kcli::InlineParser GetInlineParser() {
     kcli::InlineParser parser("--gamma");
-    parser.setHandler("-strict",
-                      handleStrict,
-                      "Enable strict gamma mode.",
-                      kcli::ValueMode::Optional);
-    parser.setHandler("-tag",
-                      handleTag,
-                      "Set a gamma tag label.",
-                      kcli::ValueMode::Required);
+    parser.setOptionalValueHandler("-strict", handleStrict, "Enable strict gamma mode.");
+    parser.setHandler("-tag", handleTag, "Set a gamma tag label.");
     return parser;
 }
 

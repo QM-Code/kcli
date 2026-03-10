@@ -34,10 +34,7 @@ int main(int argc, char** argv) {
     kcli::PrimaryParser parser;
     kcli::InlineParser build("--build");
 
-    build.setHandler("-profile",
-                     handleProfile,
-                     "Set build profile.",
-                     kcli::ValueMode::Required);
+    build.setHandler("-profile", handleProfile, "Set build profile.");
 
     parser.addInlineParser(build);
     parser.addAlias("-v", "--verbose");
@@ -56,6 +53,8 @@ int main(int argc, char** argv) {
 - `parseOrThrow()` preserves the caller's `argv` and throws `kcli::CliError`.
 - Bare inline roots such as `--build` print inline help unless a root value is
   provided.
+- `setHandler(..., ValueHandler, ...)` registers a required-value option.
+- `setOptionalValueHandler(...)` registers an optional-value option.
 - Required values may consume a first token that begins with `-`.
 - Literal `--` is rejected as an unknown option; it is not treated as an option
   terminator.

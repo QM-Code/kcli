@@ -44,14 +44,8 @@ namespace kcli::demo::alpha {
 
 kcli::InlineParser GetInlineParser() {
     kcli::InlineParser parser("--alpha");
-    parser.setHandler("-message",
-                      handleMessage,
-                      "Set alpha message label.",
-                      kcli::ValueMode::Required);
-    parser.setHandler("-enable",
-                      handleEnable,
-                      "Enable alpha processing.",
-                      kcli::ValueMode::Optional);
+    parser.setHandler("-message", handleMessage, "Set alpha message label.");
+    parser.setOptionalValueHandler("-enable", handleEnable, "Enable alpha processing.");
     return parser;
 }
 

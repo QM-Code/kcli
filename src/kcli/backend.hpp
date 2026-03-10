@@ -8,11 +8,16 @@
 
 namespace kcli::detail {
 
+enum class ValueArity {
+    Required,
+    Optional,
+};
+
 struct CommandBinding {
     bool expects_value = false;
     FlagHandler flag_handler{};
     ValueHandler value_handler{};
-    ValueMode value_mode = ValueMode::None;
+    ValueArity value_arity = ValueArity::Required;
     std::string description{};
 };
 
@@ -52,8 +57,11 @@ void SetInlineHandler(InlineParserData& data,
 void SetInlineHandler(InlineParserData& data,
                       std::string_view option,
                       ValueHandler handler,
-                      std::string_view description,
-                      ValueMode mode);
+                      std::string_view description);
+void SetInlineOptionalValueHandler(InlineParserData& data,
+                                   std::string_view option,
+                                   ValueHandler handler,
+                                   std::string_view description);
 
 void SetAlias(PrimaryParserData& data, std::string_view alias, std::string_view target);
 void SetAlias(PrimaryParserData& data,
@@ -67,8 +75,11 @@ void SetPrimaryHandler(PrimaryParserData& data,
 void SetPrimaryHandler(PrimaryParserData& data,
                        std::string_view option,
                        ValueHandler handler,
-                       std::string_view description,
-                       ValueMode mode);
+                       std::string_view description);
+void SetPrimaryOptionalValueHandler(PrimaryParserData& data,
+                                    std::string_view option,
+                                    ValueHandler handler,
+                                    std::string_view description);
 void SetPositionalHandler(PrimaryParserData& data, PositionalHandler handler);
 void AddInlineParser(PrimaryParserData& data, InlineParserData parser);
 void Parse(PrimaryParserData& data, int argc, char* const* argv);

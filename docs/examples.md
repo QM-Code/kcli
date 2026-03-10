@@ -36,8 +36,7 @@ kcli::InlineParser build("--build");
 
 build.setHandler("-profile",
                  handleProfile,
-                 "Set build profile.",
-                 kcli::ValueMode::Required);
+                 "Set build profile.");
 build.setHandler("-clean",
                  handleClean,
                  "Enable clean build.");
@@ -82,10 +81,7 @@ Behavior:
 kcli::PrimaryParser parser;
 
 parser.addAlias("-c", "--config-load", {"user-file"});
-parser.setHandler("--config-load",
-                  handleConfigLoad,
-                  "Load config.",
-                  kcli::ValueMode::Required);
+parser.setHandler("--config-load", handleConfigLoad, "Load config.");
 ```
 
 This makes:
@@ -103,8 +99,22 @@ behave like:
 Inside the handler:
 
 - `context.option` is `--config-load`
-- `context.from_alias` is `true`
 - `context.value_tokens` is `["user-file", "settings.json"]`
+
+## Optional Values
+
+```cpp
+parser.setOptionalValueHandler("--color",
+                               handleColor,
+                               "Set or auto-detect color output.");
+```
+
+This enables both:
+
+```text
+--color
+--color always
+```
 
 ## Positionals
 

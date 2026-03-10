@@ -11,15 +11,6 @@ This page summarizes the public types in
 | `kcli::InlineParser` | Defines one inline root namespace such as `--build` plus its `--build-*` handlers. |
 | `kcli::HandlerContext` | Metadata delivered to flag, value, and positional handlers. |
 | `kcli::CliError` | Exception used by `parseOrThrow()` for invalid CLI input and handler failures. |
-| `kcli::ValueMode` | Controls how a value handler consumes trailing CLI tokens. |
-
-## ValueMode
-
-| Mode | Meaning |
-| --- | --- |
-| `ValueMode::None` | The value handler runs without consuming any value tokens. |
-| `ValueMode::Required` | At least one value token is required. The first value may begin with `-`. |
-| `ValueMode::Optional` | Value tokens are optional and only start consuming when the next token looks like a value. |
 
 ## HandlerContext
 
@@ -31,8 +22,6 @@ This page summarizes the public types in
 | `option` | Effective option token after alias expansion, such as `--verbose` or `--build-profile`. Empty for positional dispatch. |
 | `command` | Normalized command name without leading dashes. Empty for positional dispatch and inline root value handlers. |
 | `value_tokens` | Effective value tokens after alias expansion. Tokens from the shell are preserved verbatim; alias preset tokens are prepended. |
-| `from_alias` | `true` when the invocation originated from `addAlias()`. |
-| `option_index` | `argv` index of the triggering option token, or the first positional token. |
 
 ## CliError
 
@@ -78,10 +67,8 @@ root instead.
 
 ```cpp
 parser.setHandler("-flag", flagHandler, "Enable build flag.");
-parser.setHandler("-profile",
-                  valueHandler,
-                  "Set build profile.",
-                  kcli::ValueMode::Required);
+parser.setHandler("-profile", valueHandler, "Set build profile.");
+parser.setOptionalValueHandler("-enable", optionalHandler, "Enable build mode.");
 ```
 
 Inline handler options may be written in either form:
@@ -95,10 +82,8 @@ Inline handler options may be written in either form:
 
 ```cpp
 parser.setHandler("--verbose", handleVerbose, "Enable verbose logging.");
-parser.setHandler("--output",
-                  handleOutput,
-                  "Set output target.",
-                  kcli::ValueMode::Required);
+parser.setHandler("--output", handleOutput, "Set output target.");
+parser.setOptionalValueHandler("--color", handleColor, "Set or auto-detect color output.");
 ```
 
 Top-level handler options may be written as either:
@@ -154,6 +139,15 @@ parser.parseOrThrow(argc, argv);
 - preserves the caller's `argv`
 - throws `kcli::CliError`
 - does not run handlers until the full command line validates
+
+## Value Handler Registration
+
+Use the registration form that matches the CLI contract you want:
+
+- `setHandler(option, FlagHandler, description)` for flag-style options
+- `setHandler(option, ValueHandler, description)` for required values
+- `setOptionalValueHandler(option, ValueHandler, description)` for optional values
+- `setRootValueHandler(...)` for bare inline roots such as `--build release`
 
 ## API Notes
 

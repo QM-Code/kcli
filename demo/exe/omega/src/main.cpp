@@ -43,16 +43,13 @@ int main(int argc, char** argv) {
     parser.addAlias("-a", "--alpha-enable");
     parser.addAlias("-b", "--build-profile");
 
-    inlineBuildParser.setHandler("-profile",
-                                 handleBuildProfile,
-                                 "Set build profile.",
-                                 kcli::ValueMode::Required);
+    inlineBuildParser.setHandler("-profile", handleBuildProfile, "Set build profile.");
     inlineBuildParser.setHandler("-clean", handleBuildClean, "Enable clean build.");
 
     parser.addInlineParser(inlineBuildParser);
 
     parser.setHandler("--verbose", handleVerbose, "Enable verbose app logging.");
-    parser.setHandler("--output", handleOutput, "Set app output target.", kcli::ValueMode::Required);
+    parser.setHandler("--output", handleOutput, "Set app output target.");
 
     parser.setPositionalHandler(handleArgs);
 

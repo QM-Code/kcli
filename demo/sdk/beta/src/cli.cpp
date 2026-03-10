@@ -65,14 +65,8 @@ namespace kcli::demo::beta {
 
 kcli::InlineParser GetInlineParser() {
     kcli::InlineParser parser("--beta");
-    parser.setHandler("-profile",
-                      handleProfile,
-                      "Select beta runtime profile.",
-                      kcli::ValueMode::Required);
-    parser.setHandler("-workers",
-                      handleWorkers,
-                      "Set beta worker count.",
-                      kcli::ValueMode::Required);
+    parser.setHandler("-profile", handleProfile, "Select beta runtime profile.");
+    parser.setHandler("-workers", handleWorkers, "Set beta worker count.");
     return parser;
 }
 

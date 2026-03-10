@@ -60,11 +60,11 @@ bare-root help view includes a row such as:
 
 ## Value Consumption Rules
 
-| Mode | What happens |
-| --- | --- |
-| `None` | The handler runs and consumes no trailing tokens. |
-| `Required` | At least one value token is required. The first token may begin with `-`. |
-| `Optional` | Values are optional. Collection starts only if the next token looks like a value. |
+`kcli` supports three public registration styles:
+
+- flag handlers consume no trailing value tokens
+- required-value handlers consume at least one value token
+- optional-value handlers consume values only when the next token looks like a value
 
 Additional details:
 
@@ -98,7 +98,7 @@ Rules:
 - consumed value tokens are not alias-expanded
 - preset tokens are prepended to effective `value_tokens`
 - preset tokens can satisfy required-value handlers
-- aliases with preset tokens cannot target handlers that do not accept values
+- aliases with preset tokens cannot target flag handlers
 
 Example:
 
@@ -120,7 +120,6 @@ invocation.
 Important details:
 
 - explicit empty positional tokens are preserved
-- the first positional token becomes `HandlerContext::option_index`
 - positionals are dispatched only after option parsing succeeds
 
 ## Failure Behavior

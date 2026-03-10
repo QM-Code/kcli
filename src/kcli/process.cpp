@@ -31,8 +31,6 @@ struct Invocation {
     std::string option{};
     std::string command{};
     std::vector<std::string> value_tokens{};
-    bool from_alias = false;
-    int option_index = -1;
     kcli::FlagHandler flag_handler{};
     kcli::ValueHandler value_handler{};
     kcli::PositionalHandler positional_handler{};
@@ -244,9 +242,9 @@ std::vector<std::pair<std::string, std::string>> BuildHelpRows(const InlineParse
     for (const auto& [command, binding] : parser.commands) {
         std::string lhs = prefix + command;
         if (binding.expects_value) {
-            if (binding.value_mode == kcli::ValueMode::Optional) {
+            if (binding.value_arity == kcli::detail::ValueArity::Optional) {
                 lhs.append(" [value]");
-            } else if (binding.value_mode == kcli::ValueMode::Required) {
+            } else if (binding.value_arity == kcli::detail::ValueArity::Required) {
                 lhs.append(" <value>");
             }
         }
@@ -292,8 +290,6 @@ bool ScheduleInvocation(const CommandBinding& binding,
     invocation.root = std::string(root);
     invocation.option = std::string(option_token);
     invocation.command = std::string(command);
-    invocation.from_alias = alias_binding != nullptr;
-    invocation.option_index = i;
 
     if (!binding.expects_value) {
         if (HasAliasPresetTokens(alias_binding)) {
@@ -309,28 +305,14 @@ bool ScheduleInvocation(const CommandBinding& binding,
         return true;
     }
 
-    if (binding.value_mode == kcli::ValueMode::None) {
-        if (HasAliasPresetTokens(alias_binding)) {
-            ReportError(result,
-                        alias_binding->alias,
-                        "alias '" + alias_binding->alias + "' presets values for option '" +
-                            std::string(option_token) + "' which does not accept values");
-            return true;
-        }
-        invocation.kind = InvocationKind::Value;
-        invocation.value_handler = binding.value_handler;
-        invocations.push_back(std::move(invocation));
-        return true;
-    }
-
     const CollectedValues collected = CollectValueTokens(i,
                                                          tokens,
                                                          consumed,
-                                                         binding.value_mode == kcli::ValueMode::Required);
+                                                         binding.value_arity == kcli::detail::ValueArity::Required);
 
     if (!collected.has_value &&
         !HasAliasPresetTokens(alias_binding) &&
-        binding.value_mode == kcli::ValueMode::Required) {
+        binding.value_arity == kcli::detail::ValueArity::Required) {
         ReportError(result, option_token, "option '" + std::string(option_token) + "' requires a value");
         return true;
     }
@@ -365,9 +347,6 @@ void SchedulePositionals(const PrimaryParserData& data,
 
         const std::string& token = tokens[static_cast<std::size_t>(i)];
         if (token.empty() || token.front() != '-') {
-            if (invocation.option_index < 0) {
-                invocation.option_index = i;
-            }
             consumed[static_cast<std::size_t>(i)] = true;
             invocation.value_tokens.emplace_back(token);
         }
@@ -406,8 +385,6 @@ void ExecuteInvocations(const std::vector<Invocation>& invocations,
         context.root = invocation.root;
         context.option = invocation.option;
         context.command = invocation.command;
-        context.from_alias = invocation.from_alias;
-        context.option_index = invocation.option_index;
         context.value_tokens.reserve(invocation.value_tokens.size());
         for (const std::string& token : invocation.value_tokens) {
             context.value_tokens.push_back(token);
@@ -511,8 +488,6 @@ void Parse(PrimaryParserData& data, int argc, char* const* argv) {
                 invocation.kind = InvocationKind::Value;
                 invocation.root = inline_match.parser->root_name;
                 invocation.option = arg;
-                invocation.from_alias = alias_binding != nullptr;
-                invocation.option_index = i;
                 invocation.value_handler = inline_match.parser->root_value_handler;
                 invocation.value_tokens = BuildEffectiveValueTokens(alias_binding, collected.parts);
                 invocations.push_back(std::move(invocation));

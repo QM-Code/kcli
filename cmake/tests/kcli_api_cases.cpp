@@ -271,8 +271,7 @@ void CaseEndUserKnownOptionsWithUnknownOptionError(TestContext& t) {
                       [&](const kcli::HandlerContext&, std::string_view value) {
                           output = std::string(value);
                       },
-                      "Set output target.",
-                      kcli::ValueMode::Required);
+                      "Set output target.");
     parser.setPositionalHandler(
         [&](const kcli::HandlerContext& context) {
             positionals = CopyTokens(context.value_tokens);
@@ -309,7 +308,9 @@ void CaseAddAliasRewritesTokens(TestContext& t) {
     parser.setHandler("--verbose",
                       [&](const kcli::HandlerContext& context) {
                           verbose = true;
-                          t.Expect(context.from_alias, "alias-expanded handlers should report from_alias=true");
+                          t.ExpectEq(std::string(context.option),
+                                     std::string("--verbose"),
+                                     "alias-expanded handlers should report the canonical option");
                       },
                       "Enable verbose logging.");
 
@@ -324,7 +325,6 @@ void CaseAddAliasRewritesTokens(TestContext& t) {
 void CaseAddAliasPresetTokensAppendToValueHandlers(TestContext& t) {
     ArgvFixture args{"prog", "-c", "settings.json"};
 
-    bool from_alias = false;
     std::string option;
     std::string value;
     std::vector<std::string> value_tokens;
@@ -333,17 +333,14 @@ void CaseAddAliasPresetTokensAppendToValueHandlers(TestContext& t) {
     parser.addAlias("-c", "--config-load", {"user-file"});
     parser.setHandler("--config-load",
                       [&](const kcli::HandlerContext& context, std::string_view captured) {
-                          from_alias = context.from_alias;
                           option = std::string(context.option);
                           value = std::string(captured);
                           value_tokens = CopyTokens(context.value_tokens);
                       },
-                      "Load config.",
-                      kcli::ValueMode::Required);
+                      "Load config.");
 
     parser.parseOrExit(args.argc, args.data());
 
-    t.Expect(from_alias, "preset-token aliases should report from_alias=true");
     t.ExpectEq(option,
                std::string("--config-load"),
                "handlers should observe the expanded long-form option");
@@ -368,13 +365,13 @@ void CaseAddAliasPresetTokensSatisfyRequiredValues(TestContext& t) {
     parser.addAlias("-p", "--profile", {"release"});
     parser.setHandler("--profile",
                       [&](const kcli::HandlerContext& context, std::string_view captured) {
-                          t.Expect(context.from_alias,
-                                   "preset-token aliases should still mark handlers as alias-driven");
+                          t.ExpectEq(std::string(context.option),
+                                     std::string("--profile"),
+                                     "preset-token aliases should dispatch the canonical option");
                           value = std::string(captured);
                           value_tokens = CopyTokens(context.value_tokens);
                       },
-                      "Set the active profile.",
-                      kcli::ValueMode::Required);
+                      "Set the active profile.");
 
     parser.parseOrExit(args.argc, args.data());
 
@@ -401,8 +398,6 @@ void CaseAddAliasPresetTokensApplyToInlineRootValues(TestContext& t) {
     config.setRootValueHandler(
         [&](const kcli::HandlerContext& context, std::string_view captured) {
             handled = true;
-            t.Expect(context.from_alias,
-                     "inline root value handlers should report alias-driven preset expansions");
             t.ExpectEq(std::string(context.option),
                        std::string("--config"),
                        "inline root handlers should observe the expanded root option");
@@ -465,10 +460,8 @@ void CasePrimaryParserCanBeReusedAcrossParses(TestContext& t) {
     kcli::PrimaryParser parser;
     parser.addAlias("-v", "--verbose");
     parser.setHandler("--verbose",
-                      [&](const kcli::HandlerContext& context) {
+                      [&](const kcli::HandlerContext&) {
                           ++calls;
-                          t.Expect(context.from_alias,
-                                   "reused parsers should still report alias-expanded handlers");
                       },
                       "Enable verbose logging.");
 
@@ -498,13 +491,10 @@ void CaseAliasDoesNotRewriteRequiredValueTokens(TestContext& t) {
                       },
                       "Enable verbose logging.");
     parser.setHandler("--output",
-                      [&](const kcli::HandlerContext& context, std::string_view value) {
+                      [&](const kcli::HandlerContext&, std::string_view value) {
                           output = std::string(value);
-                          t.Expect(!context.from_alias,
-                                   "required value handlers should not report alias expansion for payload tokens");
                       },
-                      "Set output target.",
-                      kcli::ValueMode::Required);
+                      "Set output target.");
 
     parser.parseOrExit(args.argc, args.data());
 
@@ -619,8 +609,7 @@ void CaseInlineHandlerNormalizationAcceptsShortAndFullForms(TestContext& t) {
                                      [&](const kcli::HandlerContext&, std::string_view raw_value) {
                                          value = std::string(raw_value);
                                      },
-                                     "Set build value.",
-                                     kcli::ValueMode::Required);
+                                     "Set build value.");
         });
 
     parser.parseOrExit(args.argc, args.data());
@@ -660,8 +649,7 @@ void CaseInlineBareRootPrintsHelp(TestContext& t) {
             inline_parser.setHandler("-value",
                                      [&](const kcli::HandlerContext&, std::string_view) {
                                      },
-                                     "Set build value.",
-                                     kcli::ValueMode::Required);
+                                     "Set build value.");
         });
 
     CaptureStdout capture;
@@ -719,7 +707,6 @@ void CaseInlineRootValueHandlerJoinsTokens(TestContext& t) {
     std::string received_value;
     std::vector<std::string> received_tokens;
     std::string received_option;
-    int option_index = -1;
 
     kcli::PrimaryParser parser;
     AddInlineParser(
@@ -731,7 +718,6 @@ void CaseInlineRootValueHandlerJoinsTokens(TestContext& t) {
                     received_value = std::string(value);
                     received_tokens = CopyTokens(context.value_tokens);
                     received_option = std::string(context.option);
-                    option_index = context.option_index;
                 });
         });
 
@@ -741,7 +727,6 @@ void CaseInlineRootValueHandlerJoinsTokens(TestContext& t) {
                std::vector<std::string>{"fast", "mode"},
                "root value handler should receive tokenized parts");
     t.ExpectEq(received_option, std::string("--build"), "root value handler should report the root token");
-    t.ExpectEq(option_index, 1, "root value handler should report the option index");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--build", "fast", "mode"},
                "parseOrExit() should leave argv unchanged after root value handling");
@@ -768,7 +753,7 @@ void CaseInlineMissingRootValueHandlerErrors(TestContext& t) {
                "parseOrThrow() should leave argv unchanged when root value handling fails");
 }
 
-void CaseOptionalValueModeAllowsMissingValue(TestContext& t) {
+void CaseOptionalValueHandlerAllowsMissingValue(TestContext& t) {
     ArgvFixture args{"prog", "--build-enable"};
 
     bool called = false;
@@ -780,14 +765,14 @@ void CaseOptionalValueModeAllowsMissingValue(TestContext& t) {
         parser,
         "build",
         [&](kcli::InlineParser& inline_parser) {
-            inline_parser.setHandler("-enable",
-                                     [&](const kcli::HandlerContext& context, std::string_view value) {
-                                         called = true;
-                                         received_value = std::string(value);
-                                         received_tokens = CopyTokens(context.value_tokens);
-                                     },
-                                     "Enable build mode.",
-                                     kcli::ValueMode::Optional);
+            inline_parser.setOptionalValueHandler(
+                "-enable",
+                [&](const kcli::HandlerContext& context, std::string_view value) {
+                    called = true;
+                    received_value = std::string(value);
+                    received_tokens = CopyTokens(context.value_tokens);
+                },
+                "Enable build mode.");
         });
 
     parser.parseOrExit(args.argc, args.data());
@@ -801,7 +786,7 @@ void CaseOptionalValueModeAllowsMissingValue(TestContext& t) {
                "parseOrExit() should leave argv unchanged for optional values");
 }
 
-void CaseOptionalValueModeAcceptsExplicitEmptyValue(TestContext& t) {
+void CaseOptionalValueHandlerAcceptsExplicitEmptyValue(TestContext& t) {
     ArgvFixture args{"prog", "--build-enable", ""};
 
     bool called = false;
@@ -813,14 +798,14 @@ void CaseOptionalValueModeAcceptsExplicitEmptyValue(TestContext& t) {
         parser,
         "build",
         [&](kcli::InlineParser& inline_parser) {
-            inline_parser.setHandler("-enable",
-                                     [&](const kcli::HandlerContext& context, std::string_view value) {
-                                         called = true;
-                                         received_value = std::string(value);
-                                         received_tokens = CopyTokens(context.value_tokens);
-                                     },
-                                     "Enable build mode.",
-                                     kcli::ValueMode::Optional);
+            inline_parser.setOptionalValueHandler(
+                "-enable",
+                [&](const kcli::HandlerContext& context, std::string_view value) {
+                    called = true;
+                    received_value = std::string(value);
+                    received_tokens = CopyTokens(context.value_tokens);
+                },
+                "Enable build mode.");
         });
 
     parser.parseOrExit(args.argc, args.data());
@@ -834,11 +819,11 @@ void CaseOptionalValueModeAcceptsExplicitEmptyValue(TestContext& t) {
                "parseOrExit() should leave argv unchanged for explicit empty optional values");
 }
 
-void CaseValueModeNoneDoesNotConsumeFollowingTokens(TestContext& t) {
+void CaseFlagHandlerDoesNotConsumeFollowingTokens(TestContext& t) {
     ArgvFixture args{"prog", "--build-meta", "data"};
 
     bool called = false;
-    std::string received_value;
+    std::vector<std::string> positionals;
 
     kcli::PrimaryParser parser;
     AddInlineParser(
@@ -846,23 +831,27 @@ void CaseValueModeNoneDoesNotConsumeFollowingTokens(TestContext& t) {
         "build",
         [&](kcli::InlineParser& inline_parser) {
             inline_parser.setHandler("-meta",
-                                     [&](const kcli::HandlerContext&, std::string_view value) {
+                                     [&](const kcli::HandlerContext&) {
                                          called = true;
-                                         received_value = std::string(value);
                                      },
-                                     "Record metadata.",
-                                     kcli::ValueMode::None);
+                                     "Record metadata.");
+        });
+    parser.setPositionalHandler(
+        [&](const kcli::HandlerContext& context) {
+            positionals = CopyTokens(context.value_tokens);
         });
 
     parser.parseOrExit(args.argc, args.data());
-    t.Expect(called, "ValueMode::None handler should run");
-    t.ExpectEq(received_value, std::string(), "ValueMode::None handler should receive an empty value");
+    t.Expect(called, "flag handlers should still run");
+    t.ExpectEq(positionals,
+               std::vector<std::string>{"data"},
+               "flag handlers should leave following non-option tokens as positionals");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--build-meta", "data"},
-               "parseOrExit() should leave argv unchanged for ValueMode::None");
+               "parseOrExit() should leave argv unchanged for flag handlers");
 }
 
-void CaseRequiredValueModeRejectsMissingValue(TestContext& t) {
+void CaseRequiredValueHandlerRejectsMissingValue(TestContext& t) {
     ArgvFixture args{"prog", "--build-value"};
 
     kcli::PrimaryParser parser;
@@ -873,8 +862,7 @@ void CaseRequiredValueModeRejectsMissingValue(TestContext& t) {
             inline_parser.setHandler("-value",
                                      [&](const kcli::HandlerContext&, std::string_view) {
                                      },
-                                     "Set build value.",
-                                     kcli::ValueMode::Required);
+                                     "Set build value.");
         });
 
     const CapturedCliError error = ExpectCliError(
@@ -895,7 +883,7 @@ void CaseRequiredValueModeRejectsMissingValue(TestContext& t) {
                "parseOrThrow() should leave argv unchanged when a required value is missing");
 }
 
-void CaseRequiredValueModeAcceptsDashPrefixedFirstValue(TestContext& t) {
+void CaseRequiredValueHandlerAcceptsDashPrefixedFirstValue(TestContext& t) {
     ArgvFixture args{"prog", "--build-value", "-debug"};
 
     std::string value;
@@ -910,8 +898,7 @@ void CaseRequiredValueModeAcceptsDashPrefixedFirstValue(TestContext& t) {
                 [&](const kcli::HandlerContext&, std::string_view raw_value) {
                     value = std::string(raw_value);
                 },
-                "Set build value.",
-                kcli::ValueMode::Required);
+                "Set build value.");
         });
 
     parser.parseOrExit(args.argc, args.data());
@@ -921,7 +908,7 @@ void CaseRequiredValueModeAcceptsDashPrefixedFirstValue(TestContext& t) {
                "parseOrExit() should leave argv unchanged when consuming dash-prefixed values");
 }
 
-void CaseRequiredValueModePreservesShellWhitespace(TestContext& t) {
+void CaseRequiredValueHandlerPreservesShellWhitespace(TestContext& t) {
     ArgvFixture args{"prog", "--name", " Joe "};
 
     std::string received_value;
@@ -933,8 +920,7 @@ void CaseRequiredValueModePreservesShellWhitespace(TestContext& t) {
                           received_value = std::string(value);
                           received_tokens = CopyTokens(context.value_tokens);
                       },
-                      "Set the display name.",
-                      kcli::ValueMode::Required);
+                      "Set the display name.");
 
     parser.parseOrExit(args.argc, args.data());
 
@@ -949,7 +935,7 @@ void CaseRequiredValueModePreservesShellWhitespace(TestContext& t) {
                "parseOrExit() should leave argv unchanged when values contain surrounding whitespace");
 }
 
-void CaseRequiredValueModeAcceptsExplicitEmptyValue(TestContext& t) {
+void CaseRequiredValueHandlerAcceptsExplicitEmptyValue(TestContext& t) {
     ArgvFixture args{"prog", "--name", ""};
 
     std::string received_value;
@@ -961,8 +947,7 @@ void CaseRequiredValueModeAcceptsExplicitEmptyValue(TestContext& t) {
                           received_value = std::string(value);
                           received_tokens = CopyTokens(context.value_tokens);
                       },
-                      "Set the display name.",
-                      kcli::ValueMode::Required);
+                      "Set the display name.");
 
     parser.parseOrExit(args.argc, args.data());
 
@@ -981,13 +966,11 @@ void CasePositionalHandlerPreservesExplicitEmptyTokens(TestContext& t) {
     ArgvFixture args{"prog", "", "tail"};
 
     std::vector<std::string> positionals;
-    int option_index = -1;
 
     kcli::PrimaryParser parser;
     parser.setPositionalHandler(
         [&](const kcli::HandlerContext& context) {
             positionals = CopyTokens(context.value_tokens);
-            option_index = context.option_index;
         });
 
     parser.parseOrExit(args.argc, args.data());
@@ -995,7 +978,6 @@ void CasePositionalHandlerPreservesExplicitEmptyTokens(TestContext& t) {
     t.ExpectEq(positionals,
                std::vector<std::string>{"", "tail"},
                "positional handlers should receive explicit empty shell tokens");
-    t.ExpectEq(option_index, 1, "the first explicit empty positional should set option_index");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "", "tail"},
                "parseOrExit() should leave argv unchanged for explicit empty positional values");
@@ -1117,15 +1099,13 @@ void CaseSinglePassProcessingConsumesInlineEndUserAndPositionals(TestContext& t)
                                      [&](const kcli::HandlerContext&, std::string_view value) {
                                          alpha_message = std::string(value);
                                      },
-                                     "Set alpha message.",
-                                     kcli::ValueMode::Required);
+                                     "Set alpha message.");
         });
     parser.setHandler("--output",
                       [&](const kcli::HandlerContext&, std::string_view value) {
                           output = std::string(value);
                       },
-                      "Set output target.",
-                      kcli::ValueMode::Required);
+                      "Set output target.");
     parser.setPositionalHandler(
         [&](const kcli::HandlerContext& context) {
             positionals = CopyTokens(context.value_tokens);
@@ -1151,8 +1131,7 @@ void CaseInlineParserRootOverrideApplies(TestContext& t) {
                      [&](const kcli::HandlerContext&, std::string_view value) {
                          tag = std::string(value);
                      },
-                     "Set gamma tag.",
-                     kcli::ValueMode::Required);
+                     "Set gamma tag.");
     gamma.setRoot("--newgamma");
     parser.addInlineParser(gamma);
 
@@ -1209,18 +1188,18 @@ const std::pair<std::string_view, CaseFunction> kCases[] = {
     {"inline_root_value_handler_help_row_prints", CaseInlineRootValueHandlerHelpRowPrints},
     {"inline_root_value_handler_joins_tokens", CaseInlineRootValueHandlerJoinsTokens},
     {"inline_missing_root_value_handler_errors", CaseInlineMissingRootValueHandlerErrors},
-    {"optional_value_mode_allows_missing_value", CaseOptionalValueModeAllowsMissingValue},
-    {"optional_value_mode_accepts_explicit_empty_value",
-     CaseOptionalValueModeAcceptsExplicitEmptyValue},
-    {"value_mode_none_does_not_consume_following_tokens",
-     CaseValueModeNoneDoesNotConsumeFollowingTokens},
-    {"required_value_mode_rejects_missing_value", CaseRequiredValueModeRejectsMissingValue},
-    {"required_value_mode_accepts_dash_prefixed_first_value",
-     CaseRequiredValueModeAcceptsDashPrefixedFirstValue},
-    {"required_value_mode_preserves_shell_whitespace",
-     CaseRequiredValueModePreservesShellWhitespace},
-    {"required_value_mode_accepts_explicit_empty_value",
-     CaseRequiredValueModeAcceptsExplicitEmptyValue},
+    {"optional_value_handler_allows_missing_value", CaseOptionalValueHandlerAllowsMissingValue},
+    {"optional_value_handler_accepts_explicit_empty_value",
+     CaseOptionalValueHandlerAcceptsExplicitEmptyValue},
+    {"flag_handler_does_not_consume_following_tokens",
+     CaseFlagHandlerDoesNotConsumeFollowingTokens},
+    {"required_value_handler_rejects_missing_value", CaseRequiredValueHandlerRejectsMissingValue},
+    {"required_value_handler_accepts_dash_prefixed_first_value",
+     CaseRequiredValueHandlerAcceptsDashPrefixedFirstValue},
+    {"required_value_handler_preserves_shell_whitespace",
+     CaseRequiredValueHandlerPreservesShellWhitespace},
+    {"required_value_handler_accepts_explicit_empty_value",
+     CaseRequiredValueHandlerAcceptsExplicitEmptyValue},
     {"positional_handler_preserves_explicit_empty_tokens",
      CasePositionalHandlerPreservesExplicitEmptyTokens},
     {"unknown_inline_option_errors", CaseUnknownInlineOptionErrors},
