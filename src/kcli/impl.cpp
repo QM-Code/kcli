@@ -105,19 +105,34 @@ void SetInlineHandler(InlineParserData& data,
 }
 
 void SetAlias(PrimaryParserData& data, std::string_view alias, std::string_view target) {
+    SetAlias(data, alias, target, {});
+}
+
+void SetAlias(PrimaryParserData& data,
+              std::string_view alias,
+              std::string_view target,
+              std::initializer_list<std::string_view> preset_tokens) {
     const std::string normalized_alias = NormalizeAliasOrThrow(alias);
-    const std::string normalized_target = NormalizeAliasTargetOrThrow(target);
+    const std::string normalized_target = NormalizeAliasTargetOptionOrThrow(target);
+
+    AliasBinding normalized_binding{};
+    normalized_binding.alias = normalized_alias;
+    normalized_binding.target_token = normalized_target;
+    normalized_binding.preset_tokens.reserve(preset_tokens.size());
+    for (std::string_view token : preset_tokens) {
+        normalized_binding.preset_tokens.emplace_back(token);
+    }
 
     for (AliasBinding& binding : data.aliases) {
         if (binding.alias != normalized_alias) {
             continue;
         }
 
-        binding.target = normalized_target;
+        binding = std::move(normalized_binding);
         return;
     }
 
-    data.aliases.push_back({normalized_alias, normalized_target});
+    data.aliases.push_back(std::move(normalized_binding));
 }
 
 void SetPrimaryHandler(PrimaryParserData& data,

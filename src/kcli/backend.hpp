@@ -2,6 +2,7 @@
 
 #include <kcli.hpp>
 
+#include <initializer_list>
 #include <string>
 #include <vector>
 
@@ -17,7 +18,8 @@ struct CommandBinding {
 
 struct AliasBinding {
     std::string alias{};
-    std::string target{};
+    std::string target_token{};
+    std::vector<std::string> preset_tokens{};
 };
 
 struct InlineParserData {
@@ -54,6 +56,10 @@ void SetInlineHandler(InlineParserData& data,
                       ValueMode mode);
 
 void SetAlias(PrimaryParserData& data, std::string_view alias, std::string_view target);
+void SetAlias(PrimaryParserData& data,
+              std::string_view alias,
+              std::string_view target,
+              std::initializer_list<std::string_view> preset_tokens);
 void SetPrimaryHandler(PrimaryParserData& data,
                        std::string_view option,
                        FlagHandler handler,

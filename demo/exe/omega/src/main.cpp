@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
 
     parser.setPositionalHandler(handleArgs);
 
-    parser.parse(argc, argv);
+    parser.parseOrExit(argc, argv);
 
     std::cout << "\nUsage:\n";
     std::cout << "  kcli_demo_omega --<root>\n\n";
@@ -66,4 +66,3 @@ int main(int argc, char** argv) {
     std::cout << "  --newgamma (gamma override)\n\n";
     return 0;
 }
-

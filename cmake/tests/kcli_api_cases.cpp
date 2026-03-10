@@ -238,8 +238,10 @@ void CasePrimaryParserEmptyParseSucceeds(TestContext& t) {
     ArgvFixture args{"prog"};
     kcli::PrimaryParser parser;
 
-    parser.parse(args.argc, args.data());
-    t.ExpectEq(args.CurrentTokens(), std::vector<std::string>{"prog"}, "argv should remain unchanged");
+    parser.parseOrExit(args.argc, args.data());
+    t.ExpectEq(args.CurrentTokens(),
+               std::vector<std::string>{"prog"},
+               "parseOrExit() should leave argv unchanged");
 }
 
 void CaseInlineParserRejectsInvalidRoot(TestContext& t) {
@@ -294,7 +296,7 @@ void CaseEndUserKnownOptionsWithUnknownOptionError(TestContext& t) {
                      "unknown end-user options should surface the standard error");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--verbose", "pos1", "--output", "stdout", "--bogus", "pos2"},
-               "parse() should leave the caller argv unchanged on failure");
+               "parseOrThrow() should leave the caller argv unchanged on failure");
 }
 
 void CaseAddAliasRewritesTokens(TestContext& t) {
@@ -311,12 +313,120 @@ void CaseAddAliasRewritesTokens(TestContext& t) {
                       },
                       "Enable verbose logging.");
 
-    (void)parser.parse(args.argc, args.data());
+    (void)parser.parseOrExit(args.argc, args.data());
 
     t.Expect(verbose, "alias-expanded token should trigger the registered handler");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "-v", "tail"},
-               "parse() should not rewrite the caller argv during alias handling");
+               "parseOrExit() should not rewrite the caller argv during alias handling");
+}
+
+void CaseAddAliasPresetTokensAppendToValueHandlers(TestContext& t) {
+    ArgvFixture args{"prog", "-c", "settings.json"};
+
+    bool from_alias = false;
+    std::string option;
+    std::string value;
+    std::vector<std::string> value_tokens;
+
+    kcli::PrimaryParser parser;
+    parser.addAlias("-c", "--config-load", {"user-file"});
+    parser.setHandler("--config-load",
+                      [&](const kcli::HandlerContext& context, std::string_view captured) {
+                          from_alias = context.from_alias;
+                          option = std::string(context.option);
+                          value = std::string(captured);
+                          value_tokens = CopyTokens(context.value_tokens);
+                      },
+                      "Load config.",
+                      kcli::ValueMode::Required);
+
+    parser.parseOrExit(args.argc, args.data());
+
+    t.Expect(from_alias, "preset-token aliases should report from_alias=true");
+    t.ExpectEq(option,
+               std::string("--config-load"),
+               "handlers should observe the expanded long-form option");
+    t.ExpectEq(value,
+               std::string("user-file settings.json"),
+               "preset-token aliases should prepend their configured value tokens");
+    t.ExpectEq(value_tokens,
+               std::vector<std::string>{"user-file", "settings.json"},
+               "value_tokens should expose effective tokens after alias expansion");
+    t.ExpectEq(args.CurrentTokens(),
+               std::vector<std::string>{"prog", "-c", "settings.json"},
+               "parseOrExit() should leave argv unchanged when preset-token aliases are used");
+}
+
+void CaseAddAliasPresetTokensSatisfyRequiredValues(TestContext& t) {
+    ArgvFixture args{"prog", "-p"};
+
+    std::string value;
+    std::vector<std::string> value_tokens;
+
+    kcli::PrimaryParser parser;
+    parser.addAlias("-p", "--profile", {"release"});
+    parser.setHandler("--profile",
+                      [&](const kcli::HandlerContext& context, std::string_view captured) {
+                          t.Expect(context.from_alias,
+                                   "preset-token aliases should still mark handlers as alias-driven");
+                          value = std::string(captured);
+                          value_tokens = CopyTokens(context.value_tokens);
+                      },
+                      "Set the active profile.",
+                      kcli::ValueMode::Required);
+
+    parser.parseOrExit(args.argc, args.data());
+
+    t.ExpectEq(value,
+               std::string("release"),
+               "preset tokens alone should satisfy required-value handlers");
+    t.ExpectEq(value_tokens,
+               std::vector<std::string>{"release"},
+               "effective tokens should include preset-only values");
+    t.ExpectEq(args.CurrentTokens(),
+               std::vector<std::string>{"prog", "-p"},
+               "parseOrExit() should leave argv unchanged when preset tokens satisfy a required value");
+}
+
+void CaseAddAliasPresetTokensApplyToInlineRootValues(TestContext& t) {
+    ArgvFixture args{"prog", "-c"};
+
+    bool handled = false;
+    std::string value;
+    std::vector<std::string> value_tokens;
+
+    kcli::PrimaryParser parser;
+    kcli::InlineParser config("--config");
+    config.setRootValueHandler(
+        [&](const kcli::HandlerContext& context, std::string_view captured) {
+            handled = true;
+            t.Expect(context.from_alias,
+                     "inline root value handlers should report alias-driven preset expansions");
+            t.ExpectEq(std::string(context.option),
+                       std::string("--config"),
+                       "inline root handlers should observe the expanded root option");
+            value = std::string(captured);
+            value_tokens = CopyTokens(context.value_tokens);
+        },
+        "<assignment>",
+        "Store a config assignment.");
+    parser.addInlineParser(config);
+    parser.addAlias("-c", "--config", {"user-file=/tmp/user.json"});
+
+    parser.parseOrExit(args.argc, args.data());
+
+    t.Expect(handled,
+             "preset-token aliases should invoke inline root value handlers even without trailing user tokens");
+    t.ExpectEq(value,
+               std::string("user-file=/tmp/user.json"),
+               "inline root handlers should receive preset-only values");
+    t.ExpectEq(value_tokens,
+               std::vector<std::string>{"user-file=/tmp/user.json"},
+               "inline root value_tokens should expose preset effective tokens");
+    t.ExpectEq(args.CurrentTokens(),
+               std::vector<std::string>{"prog", "-c"},
+               "parseOrExit() should leave argv unchanged for inline-root preset aliases");
 }
 
 void CaseAddAliasRewritesAfterDoubleDash(TestContext& t) {
@@ -343,7 +453,7 @@ void CaseAddAliasRewritesAfterDoubleDash(TestContext& t) {
     t.ExpectEq(error.option, std::string("--"), "literal '--' should be reported as the error token");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--", "-v"},
-               "parse() should leave argv unchanged even when alias expansion is involved");
+               "parseOrThrow() should leave argv unchanged even when alias expansion is involved");
 }
 
 void CasePrimaryParserCanBeReusedAcrossParses(TestContext& t) {
@@ -362,8 +472,8 @@ void CasePrimaryParserCanBeReusedAcrossParses(TestContext& t) {
                       },
                       "Enable verbose logging.");
 
-    parser.parse(first_args.argc, first_args.data());
-    parser.parse(second_args.argc, second_args.data());
+    parser.parseOrExit(first_args.argc, first_args.data());
+    parser.parseOrExit(second_args.argc, second_args.data());
 
     t.ExpectEq(calls, 2, "reused parsers should dispatch handlers for each parse call");
     t.ExpectEq(first_args.CurrentTokens(),
@@ -396,13 +506,13 @@ void CaseAliasDoesNotRewriteRequiredValueTokens(TestContext& t) {
                       "Set output target.",
                       kcli::ValueMode::Required);
 
-    parser.parse(args.argc, args.data());
+    parser.parseOrExit(args.argc, args.data());
 
     t.Expect(!verbose, "alias targets consumed as required values should not dispatch alias handlers");
     t.ExpectEq(output, std::string("-v"), "required value handlers should receive the raw alias-like token");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--output", "-v"},
-               "parse() should leave argv unchanged when required values look like aliases");
+               "parseOrExit() should leave argv unchanged when required values look like aliases");
 }
 
 void CaseAddAliasRejectsInvalidAlias(TestContext& t) {
@@ -423,8 +533,46 @@ void CaseAddAliasRejectsInvalidTarget(TestContext& t) {
         [&] {
             parser.addAlias("-v", "--bad target");
         },
-        "single CLI token",
+        "double-dash form",
         "addAlias() should reject alias targets with whitespace");
+}
+
+void CaseAddAliasRejectsSingleDashTarget(TestContext& t) {
+    kcli::PrimaryParser parser;
+
+    t.ExpectThrowContains<std::invalid_argument>(
+        [&] {
+            parser.addAlias("-a", "-b");
+        },
+        "double-dash form",
+        "addAlias() should reject single-dash alias targets");
+}
+
+void CaseAddAliasRejectsPresetValuesForFlagTargets(TestContext& t) {
+    ArgvFixture args{"prog", "-v"};
+
+    bool verbose = false;
+
+    kcli::PrimaryParser parser;
+    parser.addAlias("-v", "--verbose", {"unexpected"});
+    parser.setHandler("--verbose",
+                      [&](const kcli::HandlerContext&) {
+                          verbose = true;
+                      },
+                      "Enable verbose logging.");
+
+    const CapturedCliError error = ExpectCliError(
+        t,
+        [&] {
+            return parser.parseOrThrow(args.argc, args.data());
+        },
+        "preset values for flag targets should be rejected when the alias is used");
+
+    t.Expect(!verbose, "invalid preset aliases should not dispatch flag handlers");
+    t.ExpectEq(error.option, std::string("-v"), "the original alias token should be reported");
+    t.ExpectContains(error.message,
+                     "does not accept values",
+                     "flag targets should reject preset values at parse time");
 }
 
 void CasePositionalHandlerRequiresNonEmpty(TestContext& t) {
@@ -475,12 +623,12 @@ void CaseInlineHandlerNormalizationAcceptsShortAndFullForms(TestContext& t) {
                                      kcli::ValueMode::Required);
         });
 
-    parser.parse(args.argc, args.data());
+    parser.parseOrExit(args.argc, args.data());
     t.Expect(flag, "short-form inline handler should dispatch");
     t.ExpectEq(value, std::string("data"), "fully-qualified inline handler should dispatch");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--build-flag", "--build-value", "data"},
-               "parse() should not compact argv after successful inline dispatch");
+               "parseOrExit() should not compact argv after successful inline dispatch");
 }
 
 void CaseInlineHandlerNormalizationRejectsWrongRoot(TestContext& t) {
@@ -517,12 +665,12 @@ void CaseInlineBareRootPrintsHelp(TestContext& t) {
         });
 
     CaptureStdout capture;
-    parser.parse(args.argc, args.data());
+    parser.parseOrExit(args.argc, args.data());
     const std::string output = capture.str();
 
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--build"},
-               "parse() should leave argv unchanged when printing inline help");
+               "parseOrExit() should leave argv unchanged when printing inline help");
     t.ExpectContains(output,
                      "Available --build-* options:",
                      "bare inline root should print the option listing header");
@@ -554,7 +702,7 @@ void CaseInlineRootValueHandlerHelpRowPrints(TestContext& t) {
         });
 
     CaptureStdout capture;
-    parser.parse(args.argc, args.data());
+    parser.parseOrExit(args.argc, args.data());
     const std::string output = capture.str();
 
     t.ExpectContains(output,
@@ -587,7 +735,7 @@ void CaseInlineRootValueHandlerJoinsTokens(TestContext& t) {
                 });
         });
 
-    parser.parse(args.argc, args.data());
+    parser.parseOrExit(args.argc, args.data());
     t.ExpectEq(received_value, std::string("fast mode"), "root value handler should receive joined text");
     t.ExpectEq(received_tokens,
                std::vector<std::string>{"fast", "mode"},
@@ -596,7 +744,7 @@ void CaseInlineRootValueHandlerJoinsTokens(TestContext& t) {
     t.ExpectEq(option_index, 1, "root value handler should report the option index");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--build", "fast", "mode"},
-               "parse() should leave argv unchanged after root value handling");
+               "parseOrExit() should leave argv unchanged after root value handling");
 }
 
 void CaseInlineMissingRootValueHandlerErrors(TestContext& t) {
@@ -617,7 +765,7 @@ void CaseInlineMissingRootValueHandlerErrors(TestContext& t) {
                      "root value errors should explain the missing handler");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--build", "fast"},
-               "parse() should leave argv unchanged when root value handling fails");
+               "parseOrThrow() should leave argv unchanged when root value handling fails");
 }
 
 void CaseOptionalValueModeAllowsMissingValue(TestContext& t) {
@@ -642,7 +790,7 @@ void CaseOptionalValueModeAllowsMissingValue(TestContext& t) {
                                      kcli::ValueMode::Optional);
         });
 
-    parser.parse(args.argc, args.data());
+    parser.parseOrExit(args.argc, args.data());
     t.Expect(called, "optional value handler should still run");
     t.ExpectEq(received_value, std::string(), "optional value handler should receive an empty value");
     t.ExpectEq(received_tokens,
@@ -650,7 +798,7 @@ void CaseOptionalValueModeAllowsMissingValue(TestContext& t) {
                "optional value handler should receive no token parts when omitted");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--build-enable"},
-               "parse() should leave argv unchanged for optional values");
+               "parseOrExit() should leave argv unchanged for optional values");
 }
 
 void CaseOptionalValueModeAcceptsExplicitEmptyValue(TestContext& t) {
@@ -675,7 +823,7 @@ void CaseOptionalValueModeAcceptsExplicitEmptyValue(TestContext& t) {
                                      kcli::ValueMode::Optional);
         });
 
-    parser.parse(args.argc, args.data());
+    parser.parseOrExit(args.argc, args.data());
     t.Expect(called, "optional value handler should still run for an explicit empty token");
     t.ExpectEq(received_value, std::string(), "explicit empty optional values should remain empty");
     t.ExpectEq(received_tokens,
@@ -683,7 +831,7 @@ void CaseOptionalValueModeAcceptsExplicitEmptyValue(TestContext& t) {
                "optional value handlers should receive the explicit empty token");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--build-enable", ""},
-               "parse() should leave argv unchanged for explicit empty optional values");
+               "parseOrExit() should leave argv unchanged for explicit empty optional values");
 }
 
 void CaseValueModeNoneDoesNotConsumeFollowingTokens(TestContext& t) {
@@ -706,12 +854,12 @@ void CaseValueModeNoneDoesNotConsumeFollowingTokens(TestContext& t) {
                                      kcli::ValueMode::None);
         });
 
-    parser.parse(args.argc, args.data());
+    parser.parseOrExit(args.argc, args.data());
     t.Expect(called, "ValueMode::None handler should run");
     t.ExpectEq(received_value, std::string(), "ValueMode::None handler should receive an empty value");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--build-meta", "data"},
-               "parse() should leave argv unchanged for ValueMode::None");
+               "parseOrExit() should leave argv unchanged for ValueMode::None");
 }
 
 void CaseRequiredValueModeRejectsMissingValue(TestContext& t) {
@@ -744,7 +892,7 @@ void CaseRequiredValueModeRejectsMissingValue(TestContext& t) {
                      "required value errors should explain the missing value");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--build-value"},
-               "parse() should leave argv unchanged when a required value is missing");
+               "parseOrThrow() should leave argv unchanged when a required value is missing");
 }
 
 void CaseRequiredValueModeAcceptsDashPrefixedFirstValue(TestContext& t) {
@@ -766,11 +914,11 @@ void CaseRequiredValueModeAcceptsDashPrefixedFirstValue(TestContext& t) {
                 kcli::ValueMode::Required);
         });
 
-    parser.parse(args.argc, args.data());
+    parser.parseOrExit(args.argc, args.data());
     t.ExpectEq(value, std::string("-debug"), "handler should receive the dash-prefixed value");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--build-value", "-debug"},
-               "parse() should leave argv unchanged when consuming dash-prefixed values");
+               "parseOrExit() should leave argv unchanged when consuming dash-prefixed values");
 }
 
 void CaseRequiredValueModePreservesShellWhitespace(TestContext& t) {
@@ -788,7 +936,7 @@ void CaseRequiredValueModePreservesShellWhitespace(TestContext& t) {
                       "Set the display name.",
                       kcli::ValueMode::Required);
 
-    parser.parse(args.argc, args.data());
+    parser.parseOrExit(args.argc, args.data());
 
     t.ExpectEq(received_value,
                std::string(" Joe "),
@@ -798,7 +946,7 @@ void CaseRequiredValueModePreservesShellWhitespace(TestContext& t) {
                "context value tokens should preserve shell-provided whitespace");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--name", " Joe "},
-               "parse() should leave argv unchanged when values contain surrounding whitespace");
+               "parseOrExit() should leave argv unchanged when values contain surrounding whitespace");
 }
 
 void CaseRequiredValueModeAcceptsExplicitEmptyValue(TestContext& t) {
@@ -816,7 +964,7 @@ void CaseRequiredValueModeAcceptsExplicitEmptyValue(TestContext& t) {
                       "Set the display name.",
                       kcli::ValueMode::Required);
 
-    parser.parse(args.argc, args.data());
+    parser.parseOrExit(args.argc, args.data());
 
     t.ExpectEq(received_value,
                std::string(),
@@ -826,7 +974,7 @@ void CaseRequiredValueModeAcceptsExplicitEmptyValue(TestContext& t) {
                "context value tokens should preserve explicit empty required values");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--name", ""},
-               "parse() should leave argv unchanged for explicit empty required values");
+               "parseOrExit() should leave argv unchanged for explicit empty required values");
 }
 
 void CasePositionalHandlerPreservesExplicitEmptyTokens(TestContext& t) {
@@ -842,7 +990,7 @@ void CasePositionalHandlerPreservesExplicitEmptyTokens(TestContext& t) {
             option_index = context.option_index;
         });
 
-    parser.parse(args.argc, args.data());
+    parser.parseOrExit(args.argc, args.data());
 
     t.ExpectEq(positionals,
                std::vector<std::string>{"", "tail"},
@@ -850,7 +998,7 @@ void CasePositionalHandlerPreservesExplicitEmptyTokens(TestContext& t) {
     t.ExpectEq(option_index, 1, "the first explicit empty positional should set option_index");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "", "tail"},
-               "parse() should leave argv unchanged for explicit empty positional values");
+               "parseOrExit() should leave argv unchanged for explicit empty positional values");
 }
 
 void CaseUnknownInlineOptionErrors(TestContext& t) {
@@ -874,7 +1022,7 @@ void CaseUnknownInlineOptionErrors(TestContext& t) {
                      "unknown inline options should surface the standard error");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--build-unknown"},
-               "parse() should leave argv unchanged for unknown inline options");
+               "parseOrThrow() should leave argv unchanged for unknown inline options");
 }
 
 void CaseUnknownOptionReportsDoubleDash(TestContext& t) {
@@ -888,7 +1036,9 @@ void CaseUnknownOptionReportsDoubleDash(TestContext& t) {
         },
         "parseOrThrow() should reject literal '--'");
 
-    t.ExpectEq(error.option, std::string("--"), "parse() should report literal '--' as unknown");
+    t.ExpectEq(error.option,
+               std::string("--"),
+               "parseOrThrow() should report literal '--' as unknown");
 }
 
 void CaseUnknownOptionThrowsCliError(TestContext& t) {
@@ -980,14 +1130,14 @@ void CaseSinglePassProcessingConsumesInlineEndUserAndPositionals(TestContext& t)
         [&](const kcli::HandlerContext& context) {
             positionals = CopyTokens(context.value_tokens);
         });
-    (void)parser.parse(args.argc, args.data());
+    (void)parser.parseOrExit(args.argc, args.data());
 
     t.ExpectEq(alpha_message, std::string("hello"), "inline option should be consumed in the same pass");
     t.ExpectEq(output, std::string("stdout"), "end-user option should be consumed in the same pass");
     t.ExpectEq(positionals, std::vector<std::string>{"tail"}, "remaining positionals should be consumed");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "tail", "--alpha-message", "hello", "--output", "stdout"},
-               "parse() should leave argv unchanged after mixed dispatch");
+               "parseOrExit() should leave argv unchanged after mixed dispatch");
 }
 
 void CaseInlineParserRootOverrideApplies(TestContext& t) {
@@ -1006,12 +1156,12 @@ void CaseInlineParserRootOverrideApplies(TestContext& t) {
     gamma.setRoot("--newgamma");
     parser.addInlineParser(gamma);
 
-    (void)parser.parse(args.argc, args.data());
+    (void)parser.parseOrExit(args.argc, args.data());
 
     t.ExpectEq(tag, std::string("prod"), "overridden root should dispatch registered handlers");
     t.ExpectEq(args.CurrentTokens(),
                std::vector<std::string>{"prog", "--newgamma-tag", "prod"},
-               "parse() should leave argv unchanged when using an overridden root");
+               "parseOrExit() should leave argv unchanged when using an overridden root");
 }
 
 void CaseDuplicateInlineRootRejected(TestContext& t) {
@@ -1034,11 +1184,20 @@ const std::pair<std::string_view, CaseFunction> kCases[] = {
     {"end_user_known_options_with_unknown_option_error",
      CaseEndUserKnownOptionsWithUnknownOptionError},
     {"add_alias_rewrites_tokens", CaseAddAliasRewritesTokens},
+    {"add_alias_preset_tokens_append_to_value_handlers",
+     CaseAddAliasPresetTokensAppendToValueHandlers},
+    {"add_alias_preset_tokens_satisfy_required_values",
+     CaseAddAliasPresetTokensSatisfyRequiredValues},
+    {"add_alias_preset_tokens_apply_to_inline_root_values",
+     CaseAddAliasPresetTokensApplyToInlineRootValues},
     {"add_alias_rewrites_after_double_dash", CaseAddAliasRewritesAfterDoubleDash},
     {"primary_parser_can_be_reused_across_parses", CasePrimaryParserCanBeReusedAcrossParses},
     {"alias_does_not_rewrite_required_value_tokens", CaseAliasDoesNotRewriteRequiredValueTokens},
     {"add_alias_rejects_invalid_alias", CaseAddAliasRejectsInvalidAlias},
+    {"add_alias_rejects_single_dash_target", CaseAddAliasRejectsSingleDashTarget},
     {"add_alias_rejects_invalid_target", CaseAddAliasRejectsInvalidTarget},
+    {"add_alias_rejects_preset_values_for_flag_targets",
+     CaseAddAliasRejectsPresetValuesForFlagTargets},
     {"positional_handler_requires_nonempty", CasePositionalHandlerRequiresNonEmpty},
     {"end_user_handler_normalization_rejects_single_dash",
      CaseEndUserHandlerNormalizationRejectsSingleDash},

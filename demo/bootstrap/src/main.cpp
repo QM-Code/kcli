@@ -4,7 +4,7 @@
 
 int main(int argc, char** argv) {
     kcli::PrimaryParser parser;
-    parser.parse(argc, argv);
+    parser.parseOrExit(argc, argv);
     std::cout << "Bootstrap succeeded.\n";
     return 0;
 }

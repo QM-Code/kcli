@@ -115,6 +115,12 @@ void PrimaryParser::addAlias(std::string_view alias, std::string_view target) {
     detail::SetAlias(*data_, alias, target);
 }
 
+void PrimaryParser::addAlias(std::string_view alias,
+                             std::string_view target,
+                             std::initializer_list<std::string_view> preset_tokens) {
+    detail::SetAlias(*data_, alias, target, preset_tokens);
+}
+
 void PrimaryParser::setHandler(std::string_view option,
                                FlagHandler handler,
                                std::string_view description) {
@@ -136,7 +142,7 @@ void PrimaryParser::addInlineParser(InlineParser parser) {
     detail::AddInlineParser(*data_, detail::CloneInlineParserData(*parser.data_));
 }
 
-void PrimaryParser::parse(int argc, char* const* argv) {
+void PrimaryParser::parseOrExit(int argc, char* const* argv) {
     try {
         parseOrThrow(argc, argv);
     } catch (const CliError& ex) {

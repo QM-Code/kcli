@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
                       handleOutput,
                       "Set app output target.",
                       kcli::ValueMode::Required);
-    parser.parse(argc, argv);
+    parser.parseOrExit(argc, argv);
 
     std::cout << "\nKCLI demo core compile/link/integration check passed\n\n";
     std::cout << "Usage:\n";

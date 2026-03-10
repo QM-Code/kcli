@@ -47,7 +47,7 @@ Useful demo commands:
 ## Parser Objects
 
 - `PrimaryParser`
-  Owns aliases, end-user handlers, inline parser registrations, and the single `parse(argc, argv)` pass.
+  Owns aliases, end-user handlers, inline parser registrations, and the single CLI parse pass.
 - `InlineParser`
   Defines one inline root namespace such as `--alpha` or `--build` plus its `--<root>-*` handlers.
 
@@ -61,9 +61,10 @@ build.setHandler("-profile", handleProfile, "Set build profile.", kcli::ValueMod
 parser.addInlineParser(build);
 
 parser.addAlias("-v", "--verbose");
+parser.addAlias("-c", "--config-load", {"user-file"});
 parser.setHandler("--verbose", handleVerbose, "Enable verbose logging.");
 
-parser.parse(argc, argv);
+parser.parseOrExit(argc, argv);
 ```
 
 Inline mode behavior:
@@ -72,14 +73,15 @@ Inline mode behavior:
 - Root value handlers can also advertise a help row such as `--build <selector>`.
 - Required option values consume the next CLI token, even when it starts with `-`.
 - Optional values only start consuming when the next token looks like a value.
-- `HandlerContext::value_tokens` preserves raw shell tokens, including surrounding whitespace and explicit empty-string arguments.
+- `HandlerContext::value_tokens` exposes effective value tokens after alias expansion; shell tokens are preserved verbatim and alias preset tokens are prepended in order.
 - For optional-value handlers, omitted values yield an empty `value_tokens`; explicit `""` yields one empty token.
 - Unknown option-like tokens fail the parse.
 - Literal `--` is rejected as an unknown option; it is not treated as an option terminator.
-- Aliases are defined on the primary parser and only expand when a token is parsed as an option; consumed value tokens are not alias-expanded.
+- Aliases are defined on the primary parser using single-dash to double-dash form; consumed value tokens are not alias-expanded.
+- Aliases can also prepopulate value tokens, so `-c file.json` can behave like `--config-load user-file file.json`.
 - Handlers run only after the full command line validates.
-- `parse(argc, argv)` reads the caller's argument vector without rewriting or compacting it.
-- `parse()` reports invalid CLI input to `stderr` as `[error] [cli] ...`, colors `error` red and `cli` blue on terminals, and exits with code `2`.
+- `parseOrExit(argc, argv)` reads the caller's argument vector without rewriting or compacting it.
+- `parseOrExit()` reports invalid CLI input to `stderr` as `[error] [cli] ...`, colors `error` red and `cli` blue on terminals, and exits with code `2`.
 - `parseOrThrow()` is available when a caller needs to intercept `kcli::CliError` directly.
 
 Root token rules:

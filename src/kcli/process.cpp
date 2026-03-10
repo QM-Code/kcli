@@ -12,6 +12,7 @@
 
 namespace {
 
+using kcli::detail::AliasBinding;
 using kcli::detail::CommandBinding;
 using kcli::detail::InlineParserData;
 using kcli::detail::ParseOutcome;
@@ -195,17 +196,34 @@ const CommandBinding* FindCommand(const std::vector<std::pair<std::string, Comma
     return nullptr;
 }
 
-bool ApplyAliasesToOptionToken(const PrimaryParserData& data, std::string& token) {
-    bool expanded = false;
-    for (const kcli::detail::AliasBinding& alias : data.aliases) {
-        if (token != alias.alias) {
-            continue;
+const AliasBinding* FindAliasBinding(const PrimaryParserData& data, std::string_view token) {
+    for (const AliasBinding& alias : data.aliases) {
+        if (token == alias.alias) {
+            return &alias;
         }
-
-        token = alias.target;
-        expanded = true;
     }
-    return expanded;
+    return nullptr;
+}
+
+bool HasAliasPresetTokens(const AliasBinding* alias_binding) {
+    return alias_binding != nullptr && !alias_binding->preset_tokens.empty();
+}
+
+std::vector<std::string> BuildEffectiveValueTokens(const AliasBinding* alias_binding,
+                                                   const std::vector<std::string>& collected_parts) {
+    if (!HasAliasPresetTokens(alias_binding)) {
+        return collected_parts;
+    }
+
+    std::vector<std::string> merged;
+    merged.reserve(alias_binding->preset_tokens.size() + collected_parts.size());
+    for (const std::string& token : alias_binding->preset_tokens) {
+        merged.push_back(token);
+    }
+    for (const std::string& token : collected_parts) {
+        merged.push_back(token);
+    }
+    return merged;
 }
 
 std::vector<std::pair<std::string, std::string>> BuildHelpRows(const InlineParserData& parser) {
@@ -259,10 +277,10 @@ InlineTokenMatch MatchInlineToken(const PrimaryParserData& data, std::string_vie
 }
 
 bool ScheduleInvocation(const CommandBinding& binding,
+                        const AliasBinding* alias_binding,
                         std::string_view root,
                         std::string_view command,
                         std::string_view option_token,
-                        bool from_alias,
                         int& i,
                         const std::vector<std::string>& tokens,
                         std::vector<bool>& consumed,
@@ -274,10 +292,17 @@ bool ScheduleInvocation(const CommandBinding& binding,
     invocation.root = std::string(root);
     invocation.option = std::string(option_token);
     invocation.command = std::string(command);
-    invocation.from_alias = from_alias;
+    invocation.from_alias = alias_binding != nullptr;
     invocation.option_index = i;
 
     if (!binding.expects_value) {
+        if (HasAliasPresetTokens(alias_binding)) {
+            ReportError(result,
+                        alias_binding->alias,
+                        "alias '" + alias_binding->alias + "' presets values for option '" +
+                            std::string(option_token) + "' which does not accept values");
+            return true;
+        }
         invocation.kind = InvocationKind::Flag;
         invocation.flag_handler = binding.flag_handler;
         invocations.push_back(std::move(invocation));
@@ -285,6 +310,13 @@ bool ScheduleInvocation(const CommandBinding& binding,
     }
 
     if (binding.value_mode == kcli::ValueMode::None) {
+        if (HasAliasPresetTokens(alias_binding)) {
+            ReportError(result,
+                        alias_binding->alias,
+                        "alias '" + alias_binding->alias + "' presets values for option '" +
+                            std::string(option_token) + "' which does not accept values");
+            return true;
+        }
         invocation.kind = InvocationKind::Value;
         invocation.value_handler = binding.value_handler;
         invocations.push_back(std::move(invocation));
@@ -296,7 +328,9 @@ bool ScheduleInvocation(const CommandBinding& binding,
                                                          consumed,
                                                          binding.value_mode == kcli::ValueMode::Required);
 
-    if (!collected.has_value && binding.value_mode == kcli::ValueMode::Required) {
+    if (!collected.has_value &&
+        !HasAliasPresetTokens(alias_binding) &&
+        binding.value_mode == kcli::ValueMode::Required) {
         ReportError(result, option_token, "option '" + std::string(option_token) + "' requires a value");
         return true;
     }
@@ -307,7 +341,7 @@ bool ScheduleInvocation(const CommandBinding& binding,
 
     invocation.kind = InvocationKind::Value;
     invocation.value_handler = binding.value_handler;
-    invocation.value_tokens = collected.parts;
+    invocation.value_tokens = BuildEffectiveValueTokens(alias_binding, collected.parts);
     invocations.push_back(std::move(invocation));
     return true;
 }
@@ -420,7 +454,6 @@ void Parse(PrimaryParserData& data, int argc, char* const* argv) {
     }
 
     std::vector<bool> consumed(static_cast<std::size_t>(argc), false);
-    std::vector<bool> from_alias(static_cast<std::size_t>(argc), false);
     std::vector<Invocation> invocations;
     std::vector<std::string> tokens = BuildParseTokens(argc, argv);
 
@@ -434,10 +467,12 @@ void Parse(PrimaryParserData& data, int argc, char* const* argv) {
             continue;
         }
 
-        if (arg.front() == '-' &&
-            !StartsWith(arg, "--") &&
-            ApplyAliasesToOptionToken(data, arg)) {
-            from_alias[static_cast<std::size_t>(i)] = true;
+        const AliasBinding* alias_binding = nullptr;
+        if (arg.front() == '-' && !StartsWith(arg, "--")) {
+            alias_binding = FindAliasBinding(data, arg);
+            if (alias_binding != nullptr) {
+                arg = alias_binding->target_token;
+            }
         }
 
         if (arg.front() != '-') {
@@ -456,7 +491,7 @@ void Parse(PrimaryParserData& data, int argc, char* const* argv) {
                 const CollectedValues collected =
                     CollectValueTokens(i, tokens, consumed, false);
 
-                if (!collected.has_value) {
+                if (!collected.has_value && !HasAliasPresetTokens(alias_binding)) {
                     Invocation help{};
                     help.kind = InvocationKind::PrintHelp;
                     help.root = inline_match.parser->root_name;
@@ -476,12 +511,14 @@ void Parse(PrimaryParserData& data, int argc, char* const* argv) {
                 invocation.kind = InvocationKind::Value;
                 invocation.root = inline_match.parser->root_name;
                 invocation.option = arg;
-                invocation.from_alias = from_alias[static_cast<std::size_t>(i)];
+                invocation.from_alias = alias_binding != nullptr;
                 invocation.option_index = i;
                 invocation.value_handler = inline_match.parser->root_value_handler;
-                invocation.value_tokens = collected.parts;
+                invocation.value_tokens = BuildEffectiveValueTokens(alias_binding, collected.parts);
                 invocations.push_back(std::move(invocation));
-                i = collected.last_index;
+                if (collected.has_value) {
+                    i = collected.last_index;
+                }
                 break;
             }
             case InlineTokenMatch::Kind::DashOption: {
@@ -492,10 +529,10 @@ void Parse(PrimaryParserData& data, int argc, char* const* argv) {
                 }
 
                 (void)ScheduleInvocation(*binding,
+                                         alias_binding,
                                          inline_match.parser->root_name,
                                          inline_match.suffix,
                                          arg,
-                                         from_alias[static_cast<std::size_t>(i)],
                                          i,
                                          tokens,
                                          consumed,
@@ -508,10 +545,10 @@ void Parse(PrimaryParserData& data, int argc, char* const* argv) {
                 const CommandBinding* binding = FindCommand(data.commands, command);
                 if (binding != nullptr) {
                     (void)ScheduleInvocation(*binding,
+                                             alias_binding,
                                              "",
                                              command,
                                              arg,
-                                             from_alias[static_cast<std::size_t>(i)],
                                              i,
                                              tokens,
                                              consumed,

@@ -124,10 +124,17 @@ std::string NormalizeAliasOrThrow(std::string_view raw_alias) {
     return alias;
 }
 
-std::string NormalizeAliasTargetOrThrow(std::string_view raw_target) {
+std::string NormalizeAliasTargetOptionOrThrow(std::string_view raw_target) {
     const std::string target = TrimWhitespace(raw_target);
-    if (target.empty() || ContainsWhitespace(target)) {
-        throw std::invalid_argument("kcli alias target must be a single CLI token");
+    if (target.size() < 3 ||
+        !StartsWith(target, "--") ||
+        ContainsWhitespace(target)) {
+        throw std::invalid_argument(
+            "kcli alias target must use double-dash form, e.g. '--verbose'");
+    }
+    if (target[2] == '-') {
+        throw std::invalid_argument(
+            "kcli alias target must use double-dash form, e.g. '--verbose'");
     }
     return target;
 }

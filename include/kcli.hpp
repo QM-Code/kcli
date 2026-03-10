@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <initializer_list>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -9,21 +10,40 @@
 
 namespace kcli {
 
+// Controls whether a value handler consumes trailing CLI tokens.
 enum class ValueMode {
-    None,
-    Required,
-    Optional,
+    None,      // The handler runs without consuming any value tokens.
+    Required,  // At least one value token is required.
+    Optional,  // Value tokens are optional.
 };
 
+// Metadata describing one scheduled handler invocation.
 struct HandlerContext {
+
+    // Inline root name without leading dashes, for example "build".
+    // Empty for top-level handlers and positional dispatch.
     std::string_view root{};
+
+    // Effective option token after alias expansion, for example "--verbose".
+    // Empty for positional dispatch.
     std::string_view option{};
+
+    // Normalized command name without leading dashes.
+    // Empty for positional dispatch and inline root value handlers.
     std::string_view command{};
-    // Raw shell tokens consumed for this handler, preserved verbatim.
+
+    // Effective value tokens for this handler after alias expansion.
+    // Tokens originating from argv are preserved verbatim; alias preset
+    // tokens appear ahead of user-supplied tokens.
     // For optional-value handlers, an omitted value leaves this empty;
     // an explicit empty-string argument contributes one empty token.
     std::vector<std::string_view> value_tokens{};
+
+    // True when the invocation originated from addAlias().
     bool from_alias = false;
+
+    // argv index of the triggering option token, or the first positional token.
+    // Remains -1 when no concrete token applies.
     int option_index = -1;
 };
 
@@ -33,6 +53,8 @@ using ValueHandler = std::function<void(const HandlerContext&, std::string_view)
 // HandlerContext::value_tokens.
 using PositionalHandler = std::function<void(const HandlerContext&)>;
 
+// Error surfaced by parseOrThrow() for invalid CLI input or handler failures.
+// option() is empty for positional-handler failures and parser-global errors.
 class CliError : public std::runtime_error {
 public:
     CliError(std::string option, std::string message);
@@ -51,23 +73,37 @@ struct PrimaryParserData;
 
 class InlineParser {
 public:
+
+    // Registers one inline namespace such as "--build" or "--alpha".
+    // The root may be provided as "build" or "--build".
     explicit InlineParser(std::string_view root);
+
     InlineParser(const InlineParser& other);
     InlineParser& operator=(const InlineParser& other);
     InlineParser(InlineParser&& other) noexcept;
     InlineParser& operator=(InlineParser&& other) noexcept;
     ~InlineParser();
 
+    // Replaces the inline root. The root may be provided as "build" or "--build".
     void setRoot(std::string_view root);
 
+    // Handles the bare root form, for example "--build release".
+    // When no value is provided, the parser prints inline help instead.
     void setRootValueHandler(ValueHandler handler);
+
+    // Same as above, and also adds a help row such as "--build <selector>".
     void setRootValueHandler(ValueHandler handler,
                              std::string_view value_placeholder,
                              std::string_view description);
 
+    // Registers an inline flag handler. The option may be provided as "-name"
+    // or as the fully-qualified "--<root>-name".
     void setHandler(std::string_view option,
                     FlagHandler handler,
                     std::string_view description);
+
+    // Registers an inline value handler. The option may be provided as "-name"
+    // or as the fully-qualified "--<root>-name".
     void setHandler(std::string_view option,
                     ValueHandler handler,
                     std::string_view description,
@@ -82,27 +118,48 @@ private:
 class PrimaryParser {
 public:
     PrimaryParser();
+
     PrimaryParser(const PrimaryParser&) = delete;
     PrimaryParser& operator=(const PrimaryParser&) = delete;
     PrimaryParser(PrimaryParser&& other) noexcept;
     PrimaryParser& operator=(PrimaryParser&& other) noexcept;
     ~PrimaryParser();
 
+    // Maps a single-dash alias such as "-v" to a long-form option such as
+    // "--verbose". Preset tokens, when provided, are prepended to the
+    // handler's effective value_tokens.
     void addAlias(std::string_view alias, std::string_view target);
 
+    void addAlias(std::string_view alias,
+                  std::string_view target,
+                  std::initializer_list<std::string_view> preset_tokens);
+
+    // Registers a top-level flag handler. The option may be provided as
+    // "name" or "--name".
     void setHandler(std::string_view option,
                     FlagHandler handler,
                     std::string_view description);
+
+    // Registers a top-level value handler. The option may be provided as
+    // "name" or "--name".
     void setHandler(std::string_view option,
                     ValueHandler handler,
                     std::string_view description,
                     ValueMode mode = ValueMode::Required);
 
+    // Receives remaining non-option tokens after option parsing succeeds.
     void setPositionalHandler(PositionalHandler handler);
 
+    // Adds an inline parser. Duplicate roots are rejected.
     void addInlineParser(InlineParser parser);
 
-    void parse(int argc, char* const* argv);
+    // Parses argv without modifying the caller's argument vector.
+    // On failure, prints "[error] [cli] ..." to stderr and exits with code 2.
+    void parseOrExit(int argc, char* const* argv);
+
+    // Parses argv without modifying the caller's argument vector.
+    // Throws CliError on invalid CLI input or when a handler throws.
+    // No registered handlers run until the full command line validates.
     void parseOrThrow(int argc, char* const* argv);
 
 private:

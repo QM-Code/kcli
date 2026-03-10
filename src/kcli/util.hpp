@@ -17,7 +17,7 @@ std::string NormalizeInlineHandlerOptionOrThrow(std::string_view raw_option,
                                                 std::string_view root_name);
 std::string NormalizePrimaryHandlerOptionOrThrow(std::string_view raw_option);
 std::string NormalizeAliasOrThrow(std::string_view raw_alias);
-std::string NormalizeAliasTargetOrThrow(std::string_view raw_target);
+std::string NormalizeAliasTargetOptionOrThrow(std::string_view raw_target);
 std::string NormalizeHelpPlaceholderOrThrow(std::string_view raw_placeholder);
 std::string NormalizeDescriptionOrThrow(std::string_view raw_description);
 
